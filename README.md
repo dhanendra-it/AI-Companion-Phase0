@@ -69,6 +69,7 @@ The process tree is reconstructed from Windows process parent IDs at each sample
 
 ```text
 AI-Companion-Phase0/
+├── .gitignore
 ├── Cargo.lock
 ├── Cargo.toml
 ├── README.md

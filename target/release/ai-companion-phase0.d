@@ -1,1 +1,0 @@
-D:\projects\AI-Companion-Phase0\target\release\ai-companion-phase0.exe: D:\projects\AI-Companion-Phase0\assets\chat.html D:\projects\AI-Companion-Phase0\assets\robot.html D:\projects\AI-Companion-Phase0\src\main.rs
