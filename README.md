@@ -7,7 +7,7 @@ A small Windows 11 desktop prototype: a cute floating robot and a separate chat 
 - **Included:** Tao native frameless transparent always-on-top robot window, click to open chat, Alt+Space to open/focus chat, Tao chat window containing a Wry/WebView2 view, and process-tree RAM measurement script.
 - **Close behavior:** closing the chat window drops its Tao window and Wry WebView object; clicking the robot creates a fresh chat window.
 - **Not implemented:** AI/API integration, persistence, streaming, voice, OCR, screen reading, packaging/installer, startup behavior, settings, and a global registered hotkey. Robot dragging is handled by the embedded view sending pointer deltas to the native window; it still needs Windows verification. Alt+Space is detected by polling key state, so it only works while this app's event loop is active and may conflict with Windows or another app.
-- **Unverified:** This project was not built or run on Windows in this preparation. Build, window transparency, WebView2 lifetime, hotkey timing, and RAM measurements need verification on the target Windows 11 machine. No RAM values are asserted here.
+- **Verification:** `cargo build --release` completed successfully on the Windows machine for this source revision. The app has not been launched or UI-tested. Transparency, WebView2 lifetime, hotkey timing, and RAM measurements remain unverified; no RAM values are asserted here.
 - **Brief source:** The uploaded “AI Companion – Project Brief.pdf” was not available among the current project files or the referenced chat attachments. This ZIP follows the explicit Phase 0 requirements in the request and confirmed Alt+Space preference.
 
 ## Requirements
@@ -69,8 +69,8 @@ The process tree is reconstructed from Windows process parent IDs at each sample
 
 ```text
 AI-Companion-Phase0/
+├── Cargo.lock
 ├── Cargo.toml
-├── build.rs
 ├── README.md
 ├── assets/
 │   ├── chat.html

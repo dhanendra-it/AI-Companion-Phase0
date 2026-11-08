@@ -28,11 +28,11 @@ fn main() -> wry::Result<()> {
         .with_always_on_top(true)
         .build(&event_loop)
         .expect("create robot window");
-    let _robot_webview = WebViewBuilder::new()
+    let _robot_webview = WebViewBuilder::new(&robot_window)
         .with_html(ROBOT_HTML)
         .with_transparent(true)
         .with_ipc_handler(move |request| { let _ = robot_tx.send(request.body().clone()); })
-        .build(&robot_window)?;
+        .build()?;
 
     let mut chat_window: Option<Window> = None;
     let mut chat_webview: Option<WebView> = None;
@@ -107,7 +107,7 @@ fn open_chat(
         Err(error) => { eprintln!("Could not create chat window: {error}"); return; }
     };
 
-    match WebViewBuilder::new().with_html(CHAT_HTML).build(&window) {
+    match WebViewBuilder::new(&window).with_html(CHAT_HTML).build() {
         Ok(webview) => {
             *chat_window = Some(window);
             *chat_webview = Some(webview);

@@ -1,0 +1,1 @@
+cargo:rustc-link-search=native=D:\projects\AI-Companion-Phase0\target\release\build\webview2-com-sys-c9331b83e5a0cdaf\out\x64
