@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;background:transparent;overflow:hidden}
+body{display:grid;place-items:center;user-select:none;cursor:grab}button{border:0;background:transparent;padding:0;cursor:inherit;width:116px;height:132px;filter:drop-shadow(0 5px 8px #26345435)}
+button:active{cursor:grabbing}svg{width:100%;height:100%}.hint{font:11px system-ui;color:#536078;text-align:center;margin-top:-3px}
+</style>
+<button id="robot" aria-label="Open AI Companion chat" title="Click to chat"><svg viewBox="0 0 120 120" role="img" aria-label="Cute little robot">
+<ellipse cx="60" cy="108" rx="27" ry="5" fill="#263454" opacity=".12"/><path d="M60 18v9" stroke="#6377a2" stroke-width="4" stroke-linecap="round"/><circle cx="60" cy="14" r="5" fill="#ffba68"/>
+<rect x="23" y="28" width="74" height="58" rx="22" fill="#f8fbff" stroke="#91a6d0" stroke-width="4"/><rect x="32" y="38" width="56" height="34" rx="14" fill="#dff6ff"/>
+<circle cx="48" cy="53" r="4" fill="#354667"/><circle cx="72" cy="53" r="4" fill="#354667"/><path d="M53 63q7 6 14 0" fill="none" stroke="#7189bd" stroke-width="3" stroke-linecap="round"/>
+<path d="M23 51h-8m82 0h8" stroke="#91a6d0" stroke-width="5" stroke-linecap="round"/><rect x="40" y="84" width="40" height="17" rx="8" fill="#d8e3fb" stroke="#91a6d0" stroke-width="3"/><path d="M49 101v5m22-5v5" stroke="#6377a2" stroke-width="5" stroke-linecap="round"/></svg><div class="hint">hi! click to chat</div></button>
+<script>
+const robot=document.getElementById('robot');let start=null,moved=false;
+robot.addEventListener('pointerdown',e=>{start={x:e.screenX,y:e.screenY,lastX:e.screenX,lastY:e.screenY};moved=false;robot.setPointerCapture(e.pointerId)});
+robot.addEventListener('pointermove',e=>{if(!start)return;const dx=e.screenX-start.x,dy=e.screenY-start.y;if(Math.abs(dx)+Math.abs(dy)>4)moved=true;if(moved){window.ipc.postMessage(`drag:${e.screenX-start.lastX},${e.screenY-start.lastY}`);start.lastX=e.screenX;start.lastY=e.screenY}});
+robot.addEventListener('pointerup',()=>{if(start&&!moved)window.ipc.postMessage('open-chat');start=null});robot.addEventListener('pointercancel',()=>{start=null});
+</script></html>
