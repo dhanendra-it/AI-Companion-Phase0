@@ -7,5 +7,26 @@ publish = false
 [dependencies]
 tao = "0.30"
 wry = "0.45"
-windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+# Plain blocking HTTP client, no async runtime. TLS via rustls; gzip is off so
+# streamed (SSE) replies are never buffered by a decompressor.
+ureq = { version = "2", default-features = false, features = ["tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# API keys go to Windows Credential Manager.
+keyring = { version = "3", features = ["windows-native"] }
+# Screen capture (GDI), built-in Windows OCR and JPEG encoding. Same version as
+# the copy wry already pulls in, so it is not compiled twice.
+windows = { version = "0.58", features = [
+  "Foundation",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Storage_Streams",
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_System_WinRT",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
+[profile.release]
+opt-level = "s"
+strip = true
