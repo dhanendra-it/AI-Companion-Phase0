@@ -1,7 +1,111 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Companion · Phase 0</title><style>
-:root{font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:#27334c;background:#f6f8fc}*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column}
-header{padding:18px 20px;background:white;border-bottom:1px solid #e5eaf3;display:flex;align-items:center;gap:12px}.badge{font-size:24px}h1{font-size:17px;margin:0}small{color:#71809c}.messages{flex:1;padding:22px;display:flex;flex-direction:column;gap:14px}.bubble{max-width:88%;padding:13px 15px;border-radius:16px;background:white;box-shadow:0 2px 10px #30476c0c}.bubble.bot{align-self:flex-start;border-top-left-radius:5px}.bubble.user{align-self:flex-end;background:#e5edff;border-top-right-radius:5px}.notice{margin:auto 22px 0;padding:10px 12px;border-radius:10px;background:#fff4df;color:#735321;font-size:12px}.composer{padding:16px;display:flex;gap:8px;background:white;border-top:1px solid #e5eaf3}input{min-width:0;flex:1;border:1px solid #dce3ef;border-radius:12px;padding:12px;font:inherit}button{border:0;border-radius:12px;background:#647eeb;color:white;padding:0 17px;font-weight:600}
-</style><body><header><span class="badge">🤖</span><div><h1>Your AI Companion</h1><small>Phase 0 prototype</small></div></header><main class="messages" id="messages"><div class="bubble bot">Hi! I’m your little desktop companion. This is a UI prototype; I can’t answer questions yet.</div></main><aside class="notice">Chat UI only · no AI service, account, or network calls are connected.</aside><form class="composer" id="form"><input id="message" autocomplete="off" placeholder="Type a message…" aria-label="Message"><button>Send</button></form><script>
-const form=document.getElementById('form'),input=document.getElementById('message'),messages=document.getElementById('messages');form.addEventListener('submit',e=>{e.preventDefault();const value=input.value.trim();if(!value)return;const bubble=document.createElement('div');bubble.className='bubble user';bubble.textContent=value;messages.appendChild(bubble);input.value='';messages.scrollTop=messages.scrollHeight;});
+<title>AI Companion</title><style>
+:root{font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:#27334c;background:#f6f8fc;--accent:#647eeb;--line:#e5eaf3;--muted:#71809c}
+*{box-sizing:border-box}
+html,body{height:100%}body{margin:0;display:flex;flex-direction:column;overflow:hidden}
+header{padding:12px 14px 12px 18px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.badge{font-size:24px}header div.t{flex:1;min-width:0}h1{font-size:16px;margin:0;line-height:1.2}
+small{color:var(--muted);font-size:12px}
+.icon{border:0;background:transparent;color:var(--muted);font-size:17px;width:34px;height:34px;border-radius:10px;cursor:pointer}
+.icon:hover{background:#eef2fb;color:var(--accent)}
+.messages{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.bubble{max-width:90%;padding:11px 14px;border-radius:16px;background:#fff;box-shadow:0 2px 10px #30476c0c;white-space:pre-wrap;word-wrap:break-word;user-select:text}
+.bubble.bot{align-self:flex-start;border-top-left-radius:5px}
+.bubble.user{align-self:flex-end;background:#e5edff;border-top-right-radius:5px}
+.bubble.err{align-self:flex-start;background:#fff1f0;color:#8a2c22;border:1px solid #f3c9c4}
+.note{align-self:center;max-width:94%;font-size:12px;color:var(--muted);text-align:center;white-space:pre-wrap}
+.meta{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--muted);white-space:normal}
+.copy{border:1px solid var(--line);background:#fff;color:var(--accent);border-radius:8px;padding:2px 10px;font:inherit;font-size:12px;cursor:pointer}
+.copy:hover{background:#eef2fb}
+.dots::after{content:"...";animation:b 1s steps(4,end) infinite;display:inline-block;width:1.2em;overflow:hidden;vertical-align:bottom}
+@keyframes b{0%{width:0}100%{width:1.2em}}
+.composer{padding:10px 14px 14px;background:#fff;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px;align-items:flex-end}
+select{font:inherit;font-size:13px;color:var(--muted);border:1px solid #dce3ef;border-radius:10px;padding:5px 8px;background:#fff;align-self:flex-start}
+select.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+textarea{min-width:0;flex:1;resize:none;border:1px solid #dce3ef;border-radius:12px;padding:10px 12px;font:inherit;max-height:110px;outline:none}
+textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #647eeb22}
+.send{border:0;border-radius:12px;background:var(--accent);color:#fff;padding:0 18px;height:42px;font:inherit;font-weight:600;cursor:pointer}
+.send:disabled{opacity:.5;cursor:default}
+.panel{position:fixed;inset:0;background:#27334c66;display:none;align-items:center;justify-content:center;padding:16px}
+.panel.open{display:flex}
+.card{background:#fff;border-radius:16px;padding:18px;width:100%;max-width:380px;box-shadow:0 10px 40px #0003}
+.card h2{margin:0 0 4px;font-size:16px}.card p{margin:0 0 12px;font-size:12.5px;color:var(--muted)}
+.key{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.key label{font-size:13px;font-weight:600;display:flex;justify-content:space-between}
+.key label span{font-weight:400;color:var(--muted)}.key label span.ok{color:#2f8f5b}
+.key .r{display:flex;gap:6px}
+input{min-width:0;flex:1;border:1px solid #dce3ef;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;outline:none}
+.save{border:0;border-radius:10px;background:var(--accent);color:#fff;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.closep{margin-top:4px;width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px;font:inherit;cursor:pointer}
+a{color:var(--accent)}
+</style><body>
+<header><span class="badge">🤖</span><div class="t"><h1>Your AI Companion</h1><small id="sub">Ready</small></div>
+<button class="icon" id="newBtn" title="New chat" aria-label="New chat">↺</button>
+<button class="icon" id="keyBtn" title="API keys" aria-label="API keys">⚙</button></header>
+<main class="messages" id="messages"><div class="bubble bot">Hi! Ask me anything, in English or Hinglish. To work on what is on your screen, pick “Read screen (text)” below before you send.</div></main>
+<form class="composer" id="form">
+<select id="screen" aria-label="Screen"><option value="">No screen</option><option value="text">Read screen (text)</option><option value="image">Look at screen (image)</option></select>
+<div class="row"><textarea id="input" rows="1" placeholder="Type a message…" aria-label="Message" autofocus></textarea><button class="send" id="send">Send</button></div></form>
+<div class="panel" id="panel"><div class="card" role="dialog" aria-label="API keys">
+<h2>API keys</h2><p>Free keys: Groq at console.groq.com, Gemini at aistudio.google.com. Keys are saved in Windows Credential Manager, never in a file.</p>
+<div class="key"><label for="k-groq">Groq <span id="s-groq">not set</span></label><div class="r"><input id="k-groq" type="password" placeholder="Paste key" autocomplete="off"><button class="save" data-p="groq">Save</button></div></div>
+<div class="key"><label for="k-gemini">Gemini <span id="s-gemini">not set</span></label><div class="r"><input id="k-gemini" type="password" placeholder="Paste key" autocomplete="off"><button class="save" data-p="gemini">Save</button></div></div>
+<button class="closep" id="closeP">Done</button></div></div>
+<script>
+const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),screen=$('screen'),panel=$('panel');
+let busy=false,cur=null,curText='',pending=null,firstState=true;
+const post=o=>window.ipc.postMessage(JSON.stringify(o));
+const down=()=>{box.scrollTop=box.scrollHeight};
+function add(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;box.appendChild(d);down();return d}
+function setBusy(v){busy=v;sendBtn.disabled=v;if(!v)input.focus()}
+function copy(text,btn){
+  let ok=false;const t=document.createElement('textarea');t.value=text;t.style.cssText='position:fixed;opacity:0';document.body.appendChild(t);t.select();
+  try{ok=document.execCommand('copy')}catch(e){}t.remove();
+  if(!ok&&navigator.clipboard)navigator.clipboard.writeText(text).catch(()=>{});
+  btn.textContent='Copied ✓';setTimeout(()=>btn.textContent='Copy',1500);
+}
+function endPending(){if(pending){pending.remove();pending=null}}
+window.__ai={
+  token(text){endPending();if(!cur){cur=add('bubble bot','');curText=''}curText+=text;cur.textContent=curText;down()},
+  notice(text){add('note',text)},
+  error(text){endPending();if(cur&&!curText){cur.remove()}cur=null;curText='';add('bubble err',text);setBusy(false)},
+  done(info){
+    endPending();
+    if(cur){
+      const m=document.createElement('div');m.className='meta';
+      const b=document.createElement('button');b.type='button';b.className='copy';b.textContent='Copy';const text=curText;b.onclick=()=>copy(text,b);
+      const s=document.createElement('span');s.textContent='via '+info.provider;m.append(b,s);cur.appendChild(m);
+    }
+    if(info.warning)add('note',info.warning);
+    cur=null;curText='';setBusy(false);down();
+  },
+  state(s){
+    $('sub').textContent=s.hotkey?('Press '+s.hotkey+' to open'):'No global shortcut';
+    for(const p of ['groq','gemini']){const e=$('s-'+p);e.textContent=s[p]?'✓ saved':'not set';e.className=s[p]?'ok':''}
+    if(firstState&&!s.groq&&!s.gemini)panel.classList.add('open');
+    firstState=false;
+  }
+};
+function send(){
+  const text=input.value.trim();if(!text||busy)return;
+  const mode=screen.value;
+  add('bubble user',text);
+  pending=add('note dots',mode?'Reading your screen':'Thinking');
+  input.value='';input.style.height='auto';
+  screen.value='';screen.className='';  // the screen is read for this one message only
+  setBusy(true);post({t:'send',text,screen:mode});
+}
+$('form').addEventListener('submit',e=>{e.preventDefault();send()});
+input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
+input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,110)+'px'});
+screen.addEventListener('change',()=>{screen.className=screen.value?'on':''});
+$('newBtn').onclick=()=>{if(busy)return;post({t:'new'});box.textContent='';add('bubble bot','New chat. What can I help with?');input.focus()};
+$('keyBtn').onclick=()=>panel.classList.add('open');
+$('closeP').onclick=()=>{panel.classList.remove('open');input.focus()};
+document.querySelectorAll('.save').forEach(b=>b.onclick=()=>{
+  const p=b.dataset.p,i=$('k-'+p);const key=i.value.trim();if(!key)return;post({t:'key',provider:p,key});i.value='';
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(panel.classList.contains('open'))panel.classList.remove('open');else post({t:'close'})}});
+post({t:'ready'});
 </script></body></html>
