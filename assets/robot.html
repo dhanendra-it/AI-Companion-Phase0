@@ -1,18 +1,319 @@
-<!doctype html>
-<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;background:transparent;overflow:hidden}
-body{display:grid;place-items:center;user-select:none;cursor:grab}button{border:0;background:transparent;padding:0;cursor:inherit;width:116px;height:132px;filter:drop-shadow(0 5px 8px #26345435)}
-button:active{cursor:grabbing}svg{width:100%;height:100%}.hint{font:11px system-ui;color:#536078;text-align:center;margin-top:-3px}
+* { box-sizing: border-box; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+body {
+    display: grid;
+    place-items: center;
+}
+
+#companion {
+    width: 220px;
+    height: 240px;
+    background: transparent;
+}
+#companion:active { cursor: grabbing; }
+
+svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.body {
+  transform-origin: 110px 155px;
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.ear {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: earMove 4s ease-in-out infinite;
+}
+
+.ear.right { animation-delay: .4s; }
+
+.eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 5s infinite;
+}
+
+.eye.right { animation-delay: .08s; }
+
+.shadow {
+  transform-origin: center;
+  animation: shadow 3.2s ease-in-out infinite;
+}
+
+.cheek {
+  animation: cheekGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+  0%,100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-12px) rotate(1deg); }
+}
+
+@keyframes breathe {
+  0%,100% { transform: scale(1,1); }
+  50% { transform: scale(1.018,1.025); }
+}
+
+@keyframes blink {
+  0%, 44%, 48%, 100% { transform: scaleY(1); }
+  46% { transform: scaleY(.08); }
+}
+
+@keyframes earMove {
+  0%, 85%, 100% { transform: rotate(0); }
+  90% { transform: rotate(-8deg); }
+  95% { transform: rotate(4deg); }
+}
+
+@keyframes shadow {
+  0%,100% { transform: scaleX(1); opacity: .2; }
+  50% { transform: scaleX(.75); opacity: .12; }
+}
+
+@keyframes cheekGlow {
+  from { opacity: .45; }
+  to { opacity: .8; }
+}
+
+#companion:hover {
+  animation-duration: 1.7s;
+}
+
+#companion.happy {
+  animation: happy .55s ease-in-out 2;
+}
+
+#companion.thinking .body {
+  animation: think 1.5s ease-in-out infinite;
+}
+
+#companion.sleepy .eye {
+  animation: sleepy 2s ease-in-out infinite;
+}
+
+@keyframes happy {
+  0%,100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-22px) scale(1.04); }
+}
+
+@keyframes think {
+  0%,100% { transform: rotate(0); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes sleepy {
+  0%,100% { transform: scaleY(.25); }
+  50% { transform: scaleY(.12); }
+}
 </style>
-<button id="robot" aria-label="Open AI Companion chat" title="Click to chat"><svg viewBox="0 0 120 120" role="img" aria-label="Cute little robot">
-<ellipse cx="60" cy="108" rx="27" ry="5" fill="#263454" opacity=".12"/><path d="M60 18v9" stroke="#6377a2" stroke-width="4" stroke-linecap="round"/><circle cx="60" cy="14" r="5" fill="#ffba68"/>
-<rect x="23" y="28" width="74" height="58" rx="22" fill="#f8fbff" stroke="#91a6d0" stroke-width="4"/><rect x="32" y="38" width="56" height="34" rx="14" fill="#dff6ff"/>
-<circle cx="48" cy="53" r="4" fill="#354667"/><circle cx="72" cy="53" r="4" fill="#354667"/><path d="M53 63q7 6 14 0" fill="none" stroke="#7189bd" stroke-width="3" stroke-linecap="round"/>
-<path d="M23 51h-8m82 0h8" stroke="#91a6d0" stroke-width="5" stroke-linecap="round"/><rect x="40" y="84" width="40" height="17" rx="8" fill="#d8e3fb" stroke="#91a6d0" stroke-width="3"/><path d="M49 101v5m22-5v5" stroke="#6377a2" stroke-width="5" stroke-linecap="round"/></svg><div class="hint">hi! click to chat</div></button>
+</head>
+
+<body>
+<div id="companion" title="Your AI Companion">
+<svg viewBox="0 0 220 240" xmlns="http://www.w3.org/2000/svg">
+
+<defs>
+  <radialGradient id="fur" cx="35%" cy="25%" r="80%">
+    <stop offset="0%" stop-color="#aaa69c"/>
+    <stop offset="65%" stop-color="#77766f"/>
+    <stop offset="100%" stop-color="#55564f"/>
+  </radialGradient>
+
+  <radialGradient id="belly" cx="45%" cy="25%" r="80%">
+    <stop offset="0%" stop-color="#fff8e9"/>
+    <stop offset="100%" stop-color="#d9cdb9"/>
+  </radialGradient>
+
+  <radialGradient id="eyeLight">
+    <stop offset="0%" stop-color="#ffffff"/>
+    <stop offset="100%" stop-color="#c6e9ff"/>
+  </radialGradient>
+
+  <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="5"/>
+  </filter>
+</defs>
+
+<!-- Ground shadow -->
+<ellipse class="shadow" cx="110" cy="222" rx="62" ry="8"
+         fill="#333" opacity=".2" filter="url(#softShadow)"/>
+
+<g class="body">
+
+<!-- Ears -->
+<g class="ear">
+  <path d="M62 75 Q43 18 73 34 Q88 43 91 83Z"
+        fill="url(#fur)" stroke="#55564f" stroke-width="2"/>
+  <path d="M68 63 Q57 35 72 43 Q80 50 80 68Z"
+        fill="#b99d91"/>
+</g>
+
+<g class="ear right">
+  <path d="M130 83 Q139 37 159 34 Q177 31 158 80Z"
+        fill="url(#fur)" stroke="#55564f" stroke-width="2"/>
+  <path d="M145 67 Q150 47 162 44 Q167 48 153 70Z"
+        fill="#b99d91"/>
+</g>
+
+<!-- Main body -->
+<path d="M39 126
+ C35 82 67 57 110 57
+ C153 57 185 82 181 126
+ L187 183
+ Q183 211 157 214
+ L63 214
+ Q37 211 33 183Z"
+ fill="url(#fur)" stroke="#55564f" stroke-width="2"/>
+
+<!-- Belly -->
+<path d="M61 143
+ Q67 107 110 106
+ Q153 107 159 143
+ Q169 190 139 202
+ Q110 211 81 202
+ Q51 190 61 143Z"
+ fill="url(#belly)"/>
+
+<!-- Belly markings -->
+<g fill="none" stroke="#b9aa94" stroke-width="2"
+   stroke-linecap="round" opacity=".75">
+  <path d="M91 130 Q88 139 94 143"/>
+  <path d="M110 123 Q106 132 110 137"/>
+  <path d="M129 130 Q135 139 129 143"/>
+  <path d="M79 158 Q74 164 81 169"/>
+  <path d="M140 158 Q146 164 139 169"/>
+</g>
+
+<!-- Arms -->
+<path d="M43 142 Q21 148 27 170 Q33 181 51 173 L65 159Z"
+      fill="#77766f" stroke="#55564f" stroke-width="2"/>
+<path d="M177 142 Q199 148 193 170 Q187 181 169 173 L155 159Z"
+      fill="#77766f" stroke="#55564f" stroke-width="2"/>
+
+<!-- Feet -->
+<ellipse cx="78" cy="211" rx="23" ry="9" fill="#55564f"/>
+<ellipse cx="142" cy="211" rx="23" ry="9" fill="#55564f"/>
+
+<!-- Eyes -->
+<g class="eye">
+  <ellipse cx="85" cy="112" rx="8" ry="10" fill="#292b2b"/>
+  <circle cx="88" cy="108" r="3" fill="url(#eyeLight)"/>
+</g>
+<g class="eye right">
+  <ellipse cx="135" cy="112" rx="8" ry="10" fill="#292b2b"/>
+  <circle cx="138" cy="108" r="3" fill="url(#eyeLight)"/>
+</g>
+
+<!-- Nose -->
+<ellipse cx="110" cy="127" rx="7" ry="4.5" fill="#39332e"/>
+
+<!-- Smile -->
+<path d="M103 136 Q110 142 117 136"
+      fill="none" stroke="#55463e" stroke-width="2"
+      stroke-linecap="round"/>
+
+<!-- Cheeks -->
+<ellipse class="cheek" cx="67" cy="132" rx="10" ry="5"
+         fill="#d88f83" opacity=".5"/>
+<ellipse class="cheek" cx="153" cy="132" rx="10" ry="5"
+         fill="#d88f83" opacity=".5"/>
+
+<!-- Tiny forehead detail -->
+<path d="M104 82 Q110 76 116 82"
+      fill="none" stroke="#c4b8a4" stroke-width="2"
+      stroke-linecap="round" opacity=".7"/>
+
+</g>
+</svg>
+</div>
+
 <script>
-const robot=document.getElementById('robot');let start=null,moved=false;
-robot.addEventListener('pointerdown',e=>{start={x:e.screenX,y:e.screenY,lastX:e.screenX,lastY:e.screenY};moved=false;robot.setPointerCapture(e.pointerId)});
-robot.addEventListener('pointermove',e=>{if(!start)return;const dx=e.screenX-start.x,dy=e.screenY-start.y;if(Math.abs(dx)+Math.abs(dy)>4)moved=true;if(moved){window.ipc.postMessage(`drag:${e.screenX-start.lastX},${e.screenY-start.lastY}`);start.lastX=e.screenX;start.lastY=e.screenY}});
-robot.addEventListener('pointerup',()=>{if(start&&!moved)window.ipc.postMessage('open-chat');start=null});robot.addEventListener('pointercancel',()=>{start=null});
-</script></html>
+const companion = document.getElementById("companion");
+
+function react(state, duration = 2500) {
+    companion.classList.remove("happy", "thinking", "sleepy");
+
+    if (state) companion.classList.add(state);
+
+    if (duration > 0 && state) {
+        setTimeout(() => {
+            companion.classList.remove(state);
+        }, duration);
+    }
+}
+
+function sendToApp(message) {
+    window.ipc.postMessage(message);
+}
+
+// Hover reaction
+companion.addEventListener("mouseenter", () => {
+    companion.style.filter = "brightness(1.07)";
+});
+
+companion.addEventListener("mouseleave", () => {
+    companion.style.filter = "";
+});
+
+// Dragging
+let startX = 0;
+let startY = 0;
+let moved = false;
+
+companion.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+
+    startX = e.screenX;
+    startY = e.screenY;
+    moved = false;
+
+    companion.setPointerCapture(e.pointerId);
+});
+
+companion.addEventListener("pointermove", e => {
+    if (!(e.buttons & 1)) return;
+
+    const dx = e.screenX - startX;
+    const dy = e.screenY - startY;
+
+    if (Math.abs(dx) + Math.abs(dy) < 3) return;
+
+    moved = true;
+    startX = e.screenX;
+    startY = e.screenY;
+
+    sendToApp(`drag:${dx},${dy}`);
+});
+
+// Click to open chat
+companion.addEventListener("click", () => {
+    if (!moved) {
+        react("happy", 1100);
+        sendToApp("open-chat");
+    }
+});
+
+window.companionReact = react;
+</script>
+</body>
+</html>

@@ -101,7 +101,7 @@ fn main() -> wry::Result<()> {
     ));
 
     let robot_window = WindowBuilder::new().with_title("AI Companion")
-        .with_inner_size(LogicalSize::new(120.0, 140.0)).with_position(LogicalPosition::new(40.0, 120.0))
+        .with_inner_size(LogicalSize::new(250.0, 270.0)).with_position(LogicalPosition::new(40.0, 120.0))
         .with_decorations(false).with_transparent(true).with_always_on_top(true).with_skip_taskbar(true)
         .build(&event_loop).expect("create robot window");
     let robot_proxy = proxy.clone();
