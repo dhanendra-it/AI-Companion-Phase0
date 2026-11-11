@@ -46,14 +46,8 @@ and unrelated menu or button text; use what is relevant. When asked to write an 
 give only the ready-to-send text."
                 .into(),
             providers: vec![
-                ProviderCfg {
-                    name: "groq".into(),
-                    base_url: "https://api.groq.com/openai/v1".into(),
-                    model: "llama-3.3-70b-versatile".into(),
-                    vision: false,
-                },
-                gemini("gemini-2.5-flash-lite"),
-                gemini("gemini-2.5-flash"),
+                gemini("gemini-3.5-flash-lite"),
+                gemini("gemini-3.8-flash"),
             ],
         }
     }
@@ -162,8 +156,10 @@ fn short(text: &str) -> String {
 
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_secs(10))
+        .timeout_connect(Duration::from_secs(20))
         .timeout_read(Duration::from_secs(60))
+        // Honour HTTPS_PROXY / ALL_PROXY if set (ureq ignores them otherwise).
+        .try_proxy_from_env(true)
         .user_agent("ai-companion/0.1")
         .build()
 }
@@ -283,14 +279,6 @@ pub fn chat(
         match attempt(&agent, &url, &key, &body, on_token) {
             Ok(text) => {
                 return Ok(Reply { provider: provider.name.clone(), model: provider.model.clone(), text, warning: None });
-            }
-            Err(AttemptError::Midstream { partial, message }) => {
-                return Ok(Reply {
-                    provider: provider.name.clone(),
-                    model: provider.model.clone(),
-                    text: partial,
-                    warning: Some(format!("{label} stopped early: {message}")),
-                });
             }
             Err(error) => {
                 let reason = describe(&error);
