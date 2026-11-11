@@ -188,7 +188,7 @@ fn attempt(
             return Err(AttemptError::Rejected { status, detail: short(&text) });
         }
         Err(ureq::Error::Transport(transport)) => {
-            return Err(AttemptError::Network(short(&transport.to_string())));
+            return Err(AttemptError::Network(transport.to_string()));
         }
     };
 
