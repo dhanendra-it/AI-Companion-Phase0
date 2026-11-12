@@ -49,19 +49,6 @@ extern "system" {
     fn UnregisterHotKey(hwnd: *mut c_void, id: i32) -> i32;
 }
 
-const ROBOT_MENU_SCRIPT: &str = r#"
-document.addEventListener('contextmenu', (event) => {
-  event.preventDefault();
-  document.getElementById('__ai_companion_quit_menu')?.remove();
-  const menu = document.createElement('button'); menu.id = '__ai_companion_quit_menu';
-  menu.type = 'button'; menu.textContent = 'Quit';
-  Object.assign(menu.style, {position:'fixed',left:`${event.clientX}px`,top:`${event.clientY}px`,zIndex:'2147483647',padding:'8px 16px',border:'1px solid #ccd2df',borderRadius:'8px',background:'#fff',color:'#27334c',font:'14px Segoe UI,sans-serif',boxShadow:'0 4px 14px #0003',cursor:'pointer'});
-  menu.addEventListener('click', () => window.ipc.postMessage('quit')); document.body.appendChild(menu);
-  const dismiss = (pointer) => { if (!menu.contains(pointer.target)) { menu.remove(); document.removeEventListener('pointerdown', dismiss, true); } };
-  setTimeout(() => document.addEventListener('pointerdown', dismiss, true), 0);
-}, true);
-"#;
-
 fn register_global_hotkey() -> bool {
     let hwnd = std::ptr::null_mut();
     if unsafe { RegisterHotKey(hwnd, HOTKEY_ID, MOD_ALT | MOD_NOREPEAT, VK_SPACE) } != 0 { return true; }
@@ -101,12 +88,12 @@ fn main() -> wry::Result<()> {
     ));
 
     let robot_window = WindowBuilder::new().with_title("AI Companion")
-        .with_inner_size(LogicalSize::new(250.0, 270.0)).with_position(LogicalPosition::new(40.0, 120.0))
+        .with_inner_size(LogicalSize::new(190.0, 190.0)).with_position(LogicalPosition::new(40.0, 120.0))
         .with_decorations(false).with_transparent(true).with_always_on_top(true).with_skip_taskbar(true)
         .build(&event_loop).expect("create robot window");
     let robot_proxy = proxy.clone();
     let _robot_webview = WebViewBuilder::new(&robot_window).with_html(ROBOT_HTML)
-        .with_initialization_script(ROBOT_MENU_SCRIPT).with_transparent(true)
+        .with_transparent(true)
         .with_ipc_handler(move |request| { let _ = robot_proxy.send_event(AppEvent::RobotMessage(request.body().clone())); })
         .build()?;
 
@@ -122,6 +109,7 @@ fn main() -> wry::Result<()> {
             }
             Event::UserEvent(AppEvent::RobotMessage(message)) => {
                 if message == "open-chat" { open_chat(target, &proxy, &mut chat_window, &mut chat_webview); }
+                else if message == "toggle-chat" { toggle_chat(target, &proxy, &mut chat_window, &mut chat_webview); }
                 else if message == "quit" { unregister_global_hotkey(); *control_flow = ControlFlow::Exit; }
                 else if let Some(delta) = message.strip_prefix("drag:") {
                     if let Some((dx, dy)) = delta.split_once(',').and_then(|(x,y)| Some((x.parse::<f64>().ok()?,y.parse::<f64>().ok()?))) {
@@ -142,6 +130,16 @@ fn main() -> wry::Result<()> {
             _ => {}
         }
     });
+}
+
+fn toggle_chat(target: &EventLoopWindowTarget<AppEvent>, proxy: &EventLoopProxy<AppEvent>, chat_window: &mut Option<Window>, chat_webview: &mut Option<WebView>) {
+    if let Some(window) = chat_window.as_ref() {
+        let visible = window.is_visible();
+        window.set_visible(!visible);
+        if !visible { window.set_focus(); }
+        return;
+    }
+    open_chat(target, proxy, chat_window, chat_webview);
 }
 
 fn open_chat(target: &EventLoopWindowTarget<AppEvent>, proxy: &EventLoopProxy<AppEvent>, chat_window: &mut Option<Window>, chat_webview: &mut Option<WebView>) {
