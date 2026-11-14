@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aalu — Daily Scheduler</title>
+<style>
+:root {
+  font: 13px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: #e4ebf2;
+  background: #111820;
+  --accent: #48cbb2;
+  --accent-hover: #5addc2;
+  --line: #2b3744;
+  --muted: #91a0af;
+  --ink: #e8eef4;
+  --surface: #18222c;
+  --surface-2: #202c37;
+  --surface-hover: #263442;
+  --danger: #e05260;
+  --danger-hover: #f06a78;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; width: 100%; overflow: hidden; }
+body {
+  display: flex;
+  flex-direction: column;
+  background: #111820;
+  color: var(--ink);
+  user-select: none;
+}
+
+/* Window Titlebar */
+.window-bar {
+  height: 52px;
+  flex: none;
+  padding: 0 8px 0 14px;
+  background: #151d25;
+  border-bottom: 1px solid #2a3540;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  cursor: default;
+}
+.badge {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: #08211d;
+  background: #5dd8c0;
+  border-radius: 9px;
+}
+.badge svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.brand-copy { min-width: 0; }
+.brand h1 { font-size: 13.5px; margin: 0; line-height: 1.25; color: #edf3f8; font-weight: 650; }
+.brand small { display: block; color: #98a7b6; font-size: 11px; line-height: 1.2; margin-top: 1px; }
+
+.toolbar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+.window-control {
+  border: 0;
+  background: transparent;
+  color: #9cabb9;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.window-control:hover { background: #25313c; color: #edf4f8; }
+.window-control.close:hover { background: #b74349; color: #fff; }
+.window-control svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Main Split View */
+.main-content {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1px;
+  background: #232f3b;
+}
+
+.pane {
+  background: #111820;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pane-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pane-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #8fa0af;
+}
+
+/* Template Toolbar */
+.template-picker-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+select, input[type="text"], input[type="time"] {
+  font: inherit;
+  font-size: 12.5px;
+  color: #e4ebf2;
+  border: 1px solid #334250;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #17212b;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+select:focus, input:focus {
+  border-color: #48cbb2;
+  box-shadow: 0 0 0 2px #48cbb226;
+  background: #19242f;
+}
+.template-select {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.btn-group {
+  display: flex;
+  gap: 4px;
+}
+.btn-sm {
+  border: 1px solid #334250;
+  background: #1c2732;
+  color: #d1dde6;
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-sm:hover { background: #263543; border-color: #465a6c; color: #fff; }
+.btn-sm.danger:hover { background: #5c1e24; border-color: #8c2a33; color: #ffb5bc; }
+
+/* Blocks List */
+.block-list-container {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #273441;
+  border-radius: 10px;
+  background: #141c24;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.block-list-container::-webkit-scrollbar { width: 6px; }
+.block-list-container::-webkit-scrollbar-thumb { background: #2b3947; border-radius: 3px; }
+
+.block-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: #19232d;
+  border: 1px solid #283644;
+  border-radius: 7px;
+  gap: 10px;
+  transition: background .12s;
+}
+.block-row:hover { background: #1e2b37; border-color: #384a5b; }
+
+.block-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5dd8c0;
+  background: #193633;
+  border: 1px solid #255850;
+  border-radius: 5px;
+  padding: 2px 7px;
+  letter-spacing: .04em;
+  flex: none;
+}
+.block-text {
+  flex: 1;
+  font-size: 12.5px;
+  color: #e3edf5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+.block-delete {
+  border: 0;
+  background: transparent;
+  color: #798b9c;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+}
+.block-delete:hover { background: #4a1f24; color: #ff9da6; }
+
+.empty-state {
+  margin: auto;
+  text-align: center;
+  color: #7d8f9f;
+  font-size: 12px;
+  padding: 16px;
+}
+
+/* Add Block Form */
+.add-block-row {
+  display: flex;
+  gap: 6px;
+  flex: none;
+  align-items: center;
+}
+.add-block-row input[type="time"] { width: 95px; flex: none; }
+.add-block-row input[type="text"] { flex: 1; min-width: 0; }
+.btn-add {
+  border: 1px solid #2f695e;
+  border-radius: 8px;
+  background: #193732;
+  color: #70dfc9;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  flex: none;
+}
+.btn-add:hover { background: #234c45; border-color: #408a7c; color: #fff; }
+
+/* Week Plan Pane */
+.week-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-right: 2px;
+}
+.week-rows::-webkit-scrollbar { width: 6px; }
+.week-rows::-webkit-scrollbar-thumb { background: #2b3947; border-radius: 3px; }
+
+.day-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: #17212b;
+  border: 1px solid #293846;
+  border-radius: 8px;
+  gap: 10px;
+}
+.day-card.today {
+  border-color: #3b7d72;
+  background: #17282b;
+}
+
+.day-label-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+}
+.day-name {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #edf3f8;
+}
+.today-badge {
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  color: #07221d;
+  background: #5dd8c0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.day-select {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* Footer Action Bar */
+.footer-bar {
+  height: 52px;
+  flex: none;
+  background: #141c24;
+  border-top: 1px solid #273441;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.status-msg {
+  font-size: 12px;
+  color: #93a4b3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-msg.ok { color: #5dd8c0; }
+.status-msg.err { color: #f26f7a; }
+
+.btn-save {
+  border: 0;
+  border-radius: 8px;
+  background: #43bca6;
+  color: #07221d;
+  padding: 8px 22px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  transition: all .15s;
+}
+.btn-save:hover { background: #56d1ba; }
+.btn-save:active { transform: translateY(1px); }
+
+/* Modal Confirmation */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 18, 0.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+  background: #19242f;
+  border: 1px solid #364858;
+  border-radius: 12px;
+  padding: 18px 20px;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-title { font-size: 14px; font-weight: 700; color: #edf3f8; }
+.modal-desc { font-size: 12.5px; color: #a2b2c0; line-height: 1.5; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Window Titlebar -->
+<div class="window-bar">
+  <div class="brand" id="titleDrag">
+    <span class="badge">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></svg>
+    </span>
+    <div class="brand-copy">
+      <h1>Aalu — Daily Scheduler</h1>
+      <small>Timetable & Reminders · Right Ctrl+Space to toggle</small>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button class="window-control" data-window="minimize" title="Minimize" aria-label="Minimize">
+      <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+    </button>
+    <button class="window-control" data-window="maximize" title="Maximize or restore" aria-label="Maximize or restore">
+      <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+    </button>
+    <button class="window-control close" id="closeWindow" title="Close" aria-label="Close">
+      <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Main 2-Column Area -->
+<main class="main-content">
+  <!-- Left Column: Templates & Schedule Blocks -->
+  <section class="pane">
+    <div class="pane-title-row">
+      <span class="pane-title">Timetable Template</span>
+      <div class="btn-group">
+        <button class="btn-sm" id="btnNewTpl" title="Create a new template">+ New</button>
+        <button class="btn-sm" id="btnRenameTpl" title="Rename current template">Rename</button>
+        <button class="btn-sm" id="btnDupTpl" title="Duplicate current template">Duplicate</button>
+        <button class="btn-sm danger" id="btnDelTpl" title="Delete current template">Delete</button>
+      </div>
+    </div>
+
+    <div class="template-picker-row">
+      <select id="templateSelect" class="template-select" aria-label="Select Template"></select>
+    </div>
+
+    <div class="pane-title-row" style="margin-top: 4px;">
+      <span class="pane-title" id="blocksLabel">Schedule Blocks</span>
+      <small style="color:#788b9c; font-size:11px;" id="blocksCount">0 blocks</small>
+    </div>
+
+    <!-- Blocks List -->
+    <div class="block-list-container" id="blockList"></div>
+
+    <!-- Add Block Inline -->
+    <form class="add-block-row" id="addBlockForm">
+      <input type="time" id="newTime" required aria-label="Block time">
+      <input type="text" id="newText" placeholder="Block name (e.g. Exercise, Padhai)" maxlength="120" required aria-label="Block text">
+      <button class="btn-add" type="submit">+ Add</button>
+    </form>
+  </section>
+
+  <!-- Right Column: Week Plan -->
+  <section class="pane">
+    <div class="pane-title-row">
+      <span class="pane-title">Week Plan</span>
+      <small style="color:#788b9c; font-size:11px;">Assign templates to days</small>
+    </div>
+
+    <div class="week-rows" id="weekRows"></div>
+  </section>
+</main>
+
+<!-- Footer Action Bar -->
+<footer class="footer-bar">
+  <div class="status-msg" id="statusMsg">Loading schedule…</div>
+  <button class="btn-save" id="btnSave">Save Schedule</button>
+</footer>
+
+<!-- Modal Prompt / Confirm -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitle">Confirm</div>
+    <div class="modal-desc" id="modalDesc">Are you sure?</div>
+    <input type="text" id="modalInput" style="display:none;" maxlength="120">
+    <div class="modal-actions">
+      <button class="btn-sm" id="modalCancel">Cancel</button>
+      <button class="btn-sm danger" id="modalConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const post = msg => window.ipc?.postMessage(JSON.stringify(msg));
+
+// Window Actions
+document.querySelectorAll('[data-window]').forEach(btn => {
+  btn.addEventListener('click', () => post({ t: 'window', action: btn.dataset.window }));
+});
+document.getElementById('closeWindow').addEventListener('click', () => post({ t: 'close' }));
+document.getElementById('titleDrag').addEventListener('mousedown', e => {
+  if (e.button === 0) post({ t: 'window', action: e.detail === 2 ? 'maximize' : 'drag' });
+});
+
+// Escape closes the scheduler; Right Ctrl+Space is handled globally by the native app.
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    post({ t: 'close' });
+  }
+});
+
+// App State
+let schedule = {
+  version: 1,
+  templates: [],
+  week: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }
+};
+let activeTemplateId = null;
+
+const DAYS = [
+  { key: 'mon', name: 'Monday', idx: 1 },
+  { key: 'tue', name: 'Tuesday', idx: 2 },
+  { key: 'wed', name: 'Wednesday', idx: 3 },
+  { key: 'thu', name: 'Thursday', idx: 4 },
+  { key: 'fri', name: 'Friday', idx: 5 },
+  { key: 'sat', name: 'Saturday', idx: 6 },
+  { key: 'sun', name: 'Sunday', idx: 0 }
+];
+
+const currentDayIdx = new Date().getDay(); // 0 = Sunday
+
+// Elements
+const tplSelect = document.getElementById('templateSelect');
+const blockList = document.getElementById('blockList');
+const blocksLabel = document.getElementById('blocksLabel');
+const blocksCount = document.getElementById('blocksCount');
+const addBlockForm = document.getElementById('addBlockForm');
+const newTimeInput = document.getElementById('newTime');
+const newTextInput = document.getElementById('newText');
+const weekRows = document.getElementById('weekRows');
+const statusMsg = document.getElementById('statusMsg');
+const btnSave = document.getElementById('btnSave');
+
+// Modal
+const modalOverlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalDesc = document.getElementById('modalDesc');
+const modalInput = document.getElementById('modalInput');
+const modalCancel = document.getElementById('modalCancel');
+const modalConfirm = document.getElementById('modalConfirm');
+let onModalConfirm = null;
+
+function showModal({ title, desc, inputVal, isPrompt, confirmText, isDanger, onConfirm }) {
+  modalTitle.textContent = title;
+  modalDesc.textContent = desc;
+  modalConfirm.textContent = confirmText || 'OK';
+  modalConfirm.className = isDanger ? 'btn-sm danger' : 'btn-sm';
+  if (isPrompt) {
+    modalInput.style.display = 'block';
+    modalInput.value = inputVal || '';
+  } else {
+    modalInput.style.display = 'none';
+  }
+  onModalConfirm = () => {
+    const val = isPrompt ? modalInput.value.trim() : true;
+    closeModal();
+    onConfirm(val);
+  };
+  modalOverlay.classList.add('open');
+  if (isPrompt) setTimeout(() => modalInput.focus(), 50);
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  onModalConfirm = null;
+}
+modalCancel.addEventListener('click', closeModal);
+modalConfirm.addEventListener('click', () => { if (onModalConfirm) onModalConfirm(); });
+
+// Set default time to next hour
+function setNextHourDefault() {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  newTimeInput.value = `${hh}:${mm}`;
+}
+setNextHourDefault();
+
+// Render Functions
+function getActiveTemplate() {
+  return schedule.templates.find(t => t.id === activeTemplateId) || null;
+}
+
+function renderTemplates() {
+  tplSelect.innerHTML = '';
+  if (!schedule.templates.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '(No templates — Click + New)';
+    tplSelect.appendChild(opt);
+    activeTemplateId = null;
+  } else {
+    if (!activeTemplateId || !schedule.templates.some(t => t.id === activeTemplateId)) {
+      activeTemplateId = schedule.templates[0].id;
+    }
+    for (const t of schedule.templates) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} (${t.blocks.length} blocks)`;
+      if (t.id === activeTemplateId) opt.selected = true;
+      tplSelect.appendChild(opt);
+    }
+  }
+  renderBlocks();
+  renderWeekPlan();
+}
+
+function renderBlocks() {
+  blockList.innerHTML = '';
+  const current = getActiveTemplate();
+  if (!current) {
+    blocksLabel.textContent = 'Schedule Blocks';
+    blocksCount.textContent = '0 blocks';
+    blockList.innerHTML = '<div class="empty-state">Create a template above to add blocks.</div>';
+    return;
+  }
+
+  blocksLabel.textContent = `Schedule for "${current.name}"`;
+  blocksCount.textContent = `${current.blocks.length} block${current.blocks.length === 1 ? '' : 's'}`;
+
+  if (!current.blocks.length) {
+    blockList.innerHTML = '<div class="empty-state">No blocks yet. Add your first time block below.</div>';
+    return;
+  }
+
+  current.blocks.sort((a, b) => a.time.localeCompare(b.time));
+
+  for (let i = 0; i < current.blocks.length; i++) {
+    const b = current.blocks[i];
+    const row = document.createElement('div');
+    row.className = 'block-row';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'block-time';
+    timeSpan.textContent = b.time;
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'block-text';
+    textSpan.textContent = b.text;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'block-delete';
+    delBtn.title = 'Remove block';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', () => {
+      current.blocks.splice(i, 1);
+      renderTemplates();
+      setStatus('Unsaved changes');
+    });
+
+    row.appendChild(timeSpan);
+    row.appendChild(textSpan);
+    row.appendChild(delBtn);
+    blockList.appendChild(row);
+  }
+}
+
+function renderWeekPlan() {
+  weekRows.innerHTML = '';
+  for (const day of DAYS) {
+    const card = document.createElement('div');
+    card.className = `day-card ${day.idx === currentDayIdx ? 'today' : ''}`;
+
+    const labelGroup = document.createElement('div');
+    labelGroup.className = 'day-label-group';
+
+    const dayName = document.createElement('span');
+    dayName.className = 'day-name';
+    dayName.textContent = day.name;
+    labelGroup.appendChild(dayName);
+
+    if (day.idx === currentDayIdx) {
+      const badge = document.createElement('span');
+      badge.className = 'today-badge';
+      badge.textContent = 'Today';
+      labelGroup.appendChild(badge);
+    }
+
+    const select = document.createElement('select');
+    select.className = 'day-select';
+    select.setAttribute('aria-label', `Template for ${day.name}`);
+
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = 'None (No reminders)';
+    select.appendChild(noneOpt);
+
+    for (const t of schedule.templates) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      select.appendChild(opt);
+    }
+
+    select.value = schedule.week[day.key] || '';
+    select.addEventListener('change', () => {
+      schedule.week[day.key] = select.value || null;
+      setStatus('Unsaved changes');
+    });
+
+    card.appendChild(labelGroup);
+    card.appendChild(select);
+    weekRows.appendChild(card);
+  }
+}
+
+function setStatus(text, type = '') {
+  statusMsg.textContent = text;
+  statusMsg.className = `status-msg ${type}`;
+}
+
+// Template Switching
+tplSelect.addEventListener('change', () => {
+  activeTemplateId = tplSelect.value;
+  renderBlocks();
+});
+
+// Create Template
+document.getElementById('btnNewTpl').addEventListener('click', () => {
+  showModal({
+    title: 'New Timetable Template',
+    desc: 'Enter a name for this day timetable (e.g. Weekday, Weekend, Gym Day):',
+    inputVal: 'My Schedule',
+    isPrompt: true,
+    confirmText: 'Create',
+    onConfirm: name => {
+      if (!name) return;
+      const id = 't_' + Date.now();
+      schedule.templates.push({ id, name, blocks: [] });
+      activeTemplateId = id;
+      renderTemplates();
+      setStatus('Unsaved changes');
+    }
+  });
+});
+
+// Rename Template
+document.getElementById('btnRenameTpl').addEventListener('click', () => {
+  const current = getActiveTemplate();
+  if (!current) return;
+  showModal({
+    title: 'Rename Template',
+    desc: 'Enter a new name for this template:',
+    inputVal: current.name,
+    isPrompt: true,
+    confirmText: 'Rename',
+    onConfirm: name => {
+      if (!name) return;
+      current.name = name;
+      renderTemplates();
+      setStatus('Unsaved changes');
+    }
+  });
+});
+
+// Duplicate Template
+document.getElementById('btnDupTpl').addEventListener('click', () => {
+  const current = getActiveTemplate();
+  if (!current) return;
+  const id = 't_' + Date.now();
+  const name = `${current.name} (Copy)`;
+  const blocks = current.blocks.map(b => ({ ...b, id: 'b_' + Math.random().toString(36).slice(2, 8) }));
+  schedule.templates.push({ id, name, blocks });
+  activeTemplateId = id;
+  renderTemplates();
+  setStatus('Unsaved changes');
+});
+
+// Delete Template
+document.getElementById('btnDelTpl').addEventListener('click', () => {
+  const current = getActiveTemplate();
+  if (!current) return;
+
+  const assignedDays = DAYS.filter(d => schedule.week[d.key] === current.id).map(d => d.name);
+  const desc = assignedDays.length
+    ? `Template "${current.name}" is currently assigned to ${assignedDays.join(', ')}. Deleting it will set those days to None. Continue?`
+    : `Are you sure you want to delete template "${current.name}"?`;
+
+  showModal({
+    title: 'Delete Template',
+    desc,
+    confirmText: 'Delete',
+    isDanger: true,
+    onConfirm: () => {
+      for (const d of DAYS) {
+        if (schedule.week[d.key] === current.id) {
+          schedule.week[d.key] = null;
+        }
+      }
+      schedule.templates = schedule.templates.filter(t => t.id !== current.id);
+      activeTemplateId = schedule.templates[0]?.id || null;
+      renderTemplates();
+      setStatus('Unsaved changes');
+    }
+  });
+});
+
+// Add Block
+addBlockForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const current = getActiveTemplate();
+  if (!current) {
+    setStatus('Create a template first', 'err');
+    return;
+  }
+  const time = newTimeInput.value;
+  const text = newTextInput.value.trim();
+  if (!time || !text) return;
+
+  current.blocks.push({
+    id: 'b_' + Date.now(),
+    time,
+    text
+  });
+  newTextInput.value = '';
+  setNextHourDefault();
+  renderBlocks();
+  renderTemplates();
+  setStatus('Unsaved changes');
+});
+
+// Save Schedule
+btnSave.addEventListener('click', () => {
+  setStatus('Saving schedule…');
+  post({ t: 'save', data: schedule });
+});
+
+// Window IPC Bridge
+window.__sched = {
+  load(data) {
+    schedule = data || {
+      version: 1,
+      templates: [],
+      week: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }
+    };
+    renderTemplates();
+    setStatus('Schedule loaded', 'ok');
+  },
+  saveResult(ok, errorMsg) {
+    if (ok) {
+      setStatus('Saved! Takes effect immediately.', 'ok');
+    } else {
+      setStatus(`Failed to save: ${errorMsg || 'Unknown error'}`, 'err');
+    }
+  }
+};
+
+// Initial Load Request
+post({ t: 'load' });
+</script>
+</body>
+</html>

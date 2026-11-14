@@ -53,40 +53,53 @@ give only the ready-to-send text. Never use emojis."
     }
 }
 
-/// `%APPDATA%\AI Companion\config.json`
+/// `%APPDATA%\Aalu\config.json`
 pub fn config_path() -> Option<PathBuf> {
+    let base = std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+    Some(base.join("Aalu").join("config.json"))
+}
+
+/// Legacy location used before the app was renamed. Read it once and migrate it.
+pub fn legacy_config_path() -> Option<PathBuf> {
     let base = std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
     Some(base.join("AI Companion").join("config.json"))
 }
-
 /// Reads the config. On first run the defaults are written so they can be edited
 /// in Notepad. A broken file falls back to the defaults.
 pub fn load_config() -> Config {
     let default = Config::default();
     let Some(path) = config_path() else { return default };
-    match std::fs::read_to_string(&path) {
-        Ok(text) => match serde_json::from_str::<Config>(&text) {
-            Ok(cfg) if !cfg.providers.is_empty() => cfg,
-            Ok(_) => default,
+    let (text, from_legacy) = match std::fs::read_to_string(&path) {
+        Ok(text) => (Some(text), false),
+        Err(_) => match legacy_config_path().and_then(|old| std::fs::read_to_string(old).ok()) {
+            Some(text) => (Some(text), true),
+            None => (None, false),
+        },
+    };
+    if let Some(text) = text {
+        match serde_json::from_str::<Config>(&text) {
+            Ok(cfg) if !cfg.providers.is_empty() => {
+                if from_legacy {
+                    if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
+                    let _ = std::fs::write(&path, text);
+                }
+                return cfg;
+            }
+            Ok(_) => return default,
             Err(error) => {
                 eprintln!("config.json is invalid ({error}); using defaults");
-                default
+                return default;
             }
-        },
-        Err(_) => {
-            if let Some(dir) = path.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            if let Ok(text) = serde_json::to_string_pretty(&default) {
-                let _ = std::fs::write(&path, text);
-            }
-            default
         }
     }
+    if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
+    if let Ok(text) = serde_json::to_string_pretty(&default) { let _ = std::fs::write(&path, text); }
+    default
 }
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Msg {
     pub role: String,
@@ -160,7 +173,7 @@ fn agent() -> ureq::Agent {
         .timeout_read(Duration::from_secs(60))
         // Honour HTTPS_PROXY / ALL_PROXY if set (ureq ignores them otherwise).
         .try_proxy_from_env(true)
-        .user_agent("ai-companion/0.1")
+        .user_agent("aalu/0.1")
         .build()
 }
 

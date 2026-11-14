@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Robot Companion</title>
+<title>Aalu</title>
 <style>
 * {
   box-sizing: border-box;
@@ -28,10 +28,10 @@ body {
 
 #companion {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 155px;
+  bottom: 0;
+  right: 0;
+  width: 155px;
+  height: 195px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,8 +52,69 @@ svg {
   overflow: visible;
 }
 
-#callAction{display:none;position:absolute;bottom:22px;left:50%;transform:translateX(-50%);padding:6px 13px;border:1px solid #e45d69;border-radius:999px;background:#b83242;color:#fff;font:600 12px system-ui;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px #0006}
+#callAction{display:none;position:absolute;bottom:22px;right:calc(155px / 2);transform:translateX(50%);padding:6px 13px;border:1px solid #e45d69;border-radius:999px;background:#b83242;color:#fff;font:600 12px system-ui;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px #0006;z-index:50}
 #callAction.visible{display:block}
+
+/* ==================== REMINDER STRIP ==================== */
+#reminderStrip{
+  display:none;
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:284px;
+  background:#141d27f2;
+  border:1px solid #364858;
+  border-radius:12px;
+  padding:10px 14px;
+  box-shadow:0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(72,203,178,0.2);
+  color:#edf4f8;
+  cursor:pointer;
+  z-index:1000;
+  backdrop-filter:blur(10px);
+  user-select:none;
+  -webkit-user-select:none;
+}
+#reminderStrip.visible{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  animation:reminderPop .25s cubic-bezier(.16,1,.3,1);
+}
+@keyframes reminderPop{
+  from{opacity:0;transform:translateY(-8px) scale(0.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.reminder-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:#5dd8c0;
+  margin-bottom:2px;
+}
+.reminder-close{
+  color:#8c9ba9;
+  font-size:13px;
+  line-height:1;
+}
+#reminderStrip:hover .reminder-close{
+  color:#edf4f8;
+}
+.reminder-lines{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.reminder-line{
+  font-size:13px;
+  font-weight:600;
+  line-height:1.4;
+  color:#e4ebf2;
+  word-break:break-word;
+}
 /* ==================== PROCEDURAL ANIMATIONS ==================== */
 .robot {
   transform-origin: 50% 50%;
@@ -334,6 +395,13 @@ svg {
 </head>
 
 <body>
+<div id="reminderStrip" class="reminder-strip" title="Click to dismiss reminder">
+  <div class="reminder-header">
+    <span>Schedule Reminder</span>
+    <span class="reminder-close">✕</span>
+  </div>
+  <div id="reminderLines" class="reminder-lines"></div>
+</div>
 <div id="companion" class="idle" title="Click to cycle emotions, drag to move, right-click to quit">
 
 <svg class="robot" viewBox="0 0 430 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cute robot wearing blue headphones with glowing cyan eyes">
@@ -670,6 +738,12 @@ function sendToApp(message) {
 
 // ================= DRAG AND MOVE LOGIC =================
 companion.addEventListener("pointerdown", event => {
+  if (event.button === 3) {
+    event.preventDefault();
+    event.stopPropagation();
+    sendToApp("toggle-scheduler");
+    return;
+  }
   if (event.button === 1) { event.preventDefault(); sendToApp("toggle-call"); return; }
   if (event.button !== 0) return;
 
@@ -679,6 +753,21 @@ companion.addEventListener("pointerdown", event => {
   pointerId = event.pointerId;
 
   companion.setPointerCapture(event.pointerId);
+});
+
+// Prevent WebView2 back navigation on side mouse button
+window.addEventListener("auxclick", event => {
+  if (event.button === 3) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+});
+
+window.addEventListener("mouseup", event => {
+  if (event.button === 3) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 });
 
 companion.addEventListener("pointermove", event => {
@@ -840,6 +929,88 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "6") window.companionReact("love");
   if (e.key === "7") window.companionReact("sleeping");
 });
+
+// ================= REMINDER HANDLING =================
+const reminderStrip = document.getElementById("reminderStrip");
+const reminderLines = document.getElementById("reminderLines");
+let reminderTimer = null;
+let reminderAlarmInterval = null;
+let reminderAlarmTimeout = null;
+
+function stopReminderAlarm() {
+  if (reminderAlarmInterval) {
+    clearInterval(reminderAlarmInterval);
+    reminderAlarmInterval = null;
+  }
+  if (reminderAlarmTimeout) {
+    clearTimeout(reminderAlarmTimeout);
+    reminderAlarmTimeout = null;
+  }
+}
+
+function startReminderAlarm() {
+  stopReminderAlarm();
+
+  if (companion.classList.contains("sleeping")) {
+    window.companionReact("idle");
+  }
+
+  // Start the reminder motion and beep immediately, then repeat each second for eight seconds.
+  window.companionReact("lightning");
+  reminderAlarmInterval = setInterval(() => {
+    window.companionReact("lightning");
+  }, 1000);
+
+  // Return to idle after exactly 8 seconds
+  reminderAlarmTimeout = setTimeout(() => {
+    stopReminderAlarm();
+    if (companion.classList.contains("lightning")) {
+      window.companionReact("idle");
+    }
+  }, 8000);
+}
+
+function hideReminder() {
+  stopReminderAlarm();
+  if (companion.classList.contains("lightning")) {
+    window.companionReact("idle");
+  }
+  if (reminderTimer) {
+    clearTimeout(reminderTimer);
+    reminderTimer = null;
+  }
+  reminderStrip.classList.remove("visible");
+  reminderLines.innerHTML = "";
+  sendToApp("reminder:hide");
+}
+
+reminderStrip.addEventListener("pointerdown", event => {
+  event.stopPropagation();
+});
+reminderStrip.addEventListener("click", event => {
+  event.stopPropagation();
+  hideReminder();
+});
+
+window.__reminder = function(lines) {
+  if (!lines || !lines.length) return;
+
+  // 8 seconds repetitive beep + movement
+  startReminderAlarm();
+
+  for (const line of lines) {
+    const div = document.createElement("div");
+    div.className = "reminder-line";
+    div.textContent = line;
+    reminderLines.appendChild(div);
+  }
+
+  reminderStrip.classList.add("visible");
+
+  // 30 seconds auto-hide
+  if (reminderTimer) clearTimeout(reminderTimer);
+  reminderTimer = setTimeout(hideReminder, 30000);
+};
 
 // Initialize in idle
 window.companionReact("idle");

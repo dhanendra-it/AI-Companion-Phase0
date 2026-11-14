@@ -1,14 +1,16 @@
-# AI Companion — Phase 0
+# Aalu
 
-A small Windows 11 desktop prototype: a cute floating robot and a separate chat window. The chat is a local UI mockup only; it is not connected to an AI service.
+A Windows 11 desktop companion with a floating robot, AI chat, voice calls, screen context, and a daily scheduler.
 
 ## Scope and status
 
-- **Included:** Tao native frameless transparent always-on-top robot window, click to open chat, Alt+Space to open/focus chat, Tao chat window containing a Wry/WebView2 view, and process-tree RAM measurement script.
+- **Included:** Tao native frameless transparent always-on-top robot window, click to open chat, Alt+Space chat, Right Ctrl+Space scheduler, and Right Ctrl+Up robot visibility hotkeys, Wry/WebView2 chat, AI providers, voice calling, screen context, reminders, custom robot window icon, Windows sign-in startup registration, and process-tree RAM measurement script.
+- **Windows startup:** when the app launches, it registers itself for the current Windows user so the robot starts at sign-in.
+- **Window icon:** the chat and scheduler windows use the custom Aalu robot icon.
 - **Close behavior:** closing the chat window drops its Tao window and Wry WebView object; clicking the robot creates a fresh chat window.
-- **Not implemented:** AI/API integration, persistence, streaming, voice, OCR, screen reading, packaging/installer, startup behavior, settings, and a global registered hotkey. Robot dragging is handled by the embedded view sending pointer deltas to the native window; it still needs Windows verification. Alt+Space is detected by polling key state, so it only works while this app's event loop is active and may conflict with Windows or another app.
-- **Verification:** `cargo build --release` completed successfully on the Windows machine for this source revision. The app has not been launched or UI-tested. Transparency, WebView2 lifetime, hotkey timing, and RAM measurements remain unverified; no RAM values are asserted here.
-- **Brief source:** The uploaded “AI Companion – Project Brief.pdf” was not available among the current project files or the referenced chat attachments. This ZIP follows the explicit Phase 0 requirements in the request and confirmed Alt+Space preference.
+- **Not implemented:** packaging/installer and persistent chat history. Robot dragging, hotkeys, and startup behavior still need Windows runtime verification.
+- **Verification:** `cargo check --release` passes with the updated shortcuts. The previous full build could not replace `target\release\aalu.exe` (Access denied); close Aalu before rebuilding. Shortcut behavior still needs a live Windows check.
+- **Shortcuts:** Alt+Space toggles chat; Right Ctrl+Space toggles the scheduler; Right Ctrl+Up shows or hides the robot.
 
 ## Requirements
 
@@ -28,7 +30,7 @@ cargo build --release
 cargo run --release
 ```
 
-The robot appears near the upper-left of the primary screen. Click it to open the chat. Close chat with its window close button; the chat window/WebView is dropped, and another robot click opens a new one. Alt+Space opens or focuses chat while the app is running. Close the robot window to exit.
+Aalu stays above other windows. Left-click it for chat, middle-click to toggle a voice call, and use mouse button 3 to open or close the scheduler. Press Right Ctrl+Space to toggle the scheduler, Alt+Space to toggle chat, or Right Ctrl+Up to show/hide the robot. Escape closes the focused scheduler or chat window.
 
 If WebView2 cannot be created, confirm the Evergreen Runtime is installed and retry. Cargo's first build downloads Rust crates.
 
@@ -36,7 +38,7 @@ If WebView2 cannot be created, confirm the Evergreen Runtime is installed and re
 
 1. Run the app and confirm the robot has no visible window rectangle, stays above ordinary windows, and can be dragged.
 2. Click the robot; confirm one chat window opens. Close it, click the robot again, and confirm a fresh chat window opens.
-3. With the app active, press Alt+Space and confirm chat opens/focuses. Check whether another application or Windows consumes this chord.
+3. Press Right Ctrl+Space to open and close the scheduler; press Alt+Space for chat; press Right Ctrl+Up to hide and show the robot.
 4. Measure the three states below. Keep the robot running throughout; allow the app to settle before each capture.
 
 ## RAM measurement (Windows PowerShell 7)
@@ -68,7 +70,7 @@ The process tree is reconstructed from Windows process parent IDs at each sample
 ## Project files
 
 ```text
-AI-Companion-Phase0/
+Aalu/
 ├── .gitignore
 ├── Cargo.lock
 ├── Cargo.toml

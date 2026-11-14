@@ -1,5 +1,5 @@
 [package]
-name = "ai-companion-phase0"
+name = "aalu"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -23,6 +23,7 @@ windows = { version = "0.58", features = [
   "Storage_Streams",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
+  "Win32_System_SystemInformation",
   "Win32_System_WinRT",
   "Win32_UI_WindowsAndMessaging",
 ] }

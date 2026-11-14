@@ -46,7 +46,7 @@ pub struct Backend {
     cfg: Arc<Config>,
     deps: Deps,
     emit: Emit,
-    /// Shown in the chat page, e.g. "Alt+Space".
+    /// Shown in the chat page, e.g. "Ctrl+Space".
     hotkey: String,
     history: Arc<Mutex<Vec<Msg>>>,
     busy: Arc<AtomicBool>,
