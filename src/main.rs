@@ -8,6 +8,7 @@ mod keys;
 mod screen;
 
 use std::{
+    borrow::Cow,
     ffi::c_void,
     sync::{Arc, Mutex},
 };
@@ -28,7 +29,7 @@ use tao::{
     window::{Window, WindowBuilder},
 };
 
-use wry::{PermissionKind, PermissionResponse, WebView, WebViewBuilder};
+use wry::{PermissionKind, PermissionResponse, WebView, WebViewBuilder, WebViewBuilderExtWindows};
 
 const ROBOT_HTML: &str = include_str!("../assets/robot.html");
 const CHAT_HTML: &str = include_str!("../assets/chat.html");
@@ -555,9 +556,17 @@ fn open_chat(
     let chat_proxy = proxy.clone();
 
     match WebViewBuilder::new()
-        .with_html(CHAT_HTML)
+        .with_profile_name("AaluVoice")
+        .with_https_scheme(true)
+        .with_custom_protocol("aalu".into(), |_webview_id, _request| {
+            wry::http::Response::builder()
+                .header("Content-Type", "text/html; charset=utf-8")
+                .body(Cow::Borrowed(CHAT_HTML.as_bytes()))
+                .expect("valid embedded chat response")
+        })
+        .with_url("aalu://chat/index.html")
         .with_permission_handler(|kind| match kind {
-            PermissionKind::Microphone => PermissionResponse::Default,
+            PermissionKind::Microphone => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
         })
         .with_ipc_handler(move |request| {

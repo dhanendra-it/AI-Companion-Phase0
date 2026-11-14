@@ -12,7 +12,7 @@ html,body{height:100%}body{margin:0;display:flex;flex-direction:column;overflow:
 .brand small{display:block;color:#98a7b6;font-size:11px;line-height:1.25;margin-top:2px}
 .toolbar{height:100%;display:flex;align-items:center;gap:2px;flex:none}
 .icon,.window-control{border:0;background:transparent;color:#9cabb9;width:34px;height:34px;display:grid;place-items:center;border-radius:8px;cursor:pointer}
-.icon.active{background:#7e2632;color:#fff}.icon:hover,.window-control:hover{background:#25313c;color:#edf4f8}
+.icon.active{background:#7e2632;color:#fff}.voice-wave{display:none;align-items:center;gap:2px;width:24px;height:28px;color:#6fe0ca}.voice-wave.speaking{display:flex}.voice-wave i{display:block;width:2px;height:5px;border-radius:2px;background:currentColor;transform:scaleY(.5)}.voice-wave.speaking i{animation:voiceWave .7s ease-in-out infinite alternate}.voice-wave i:nth-child(2){animation-delay:.12s}.voice-wave i:nth-child(3){animation-delay:.24s}.voice-wave i:nth-child(4){animation-delay:.08s}@keyframes voiceWave{to{transform:scaleY(2.8)}}body.voice-active .context-row{display:none}.icon:hover,.window-control:hover{background:#25313c;color:#edf4f8}
 .icon svg,.window-control svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .window-divider{height:20px;width:1px;background:#34414e;margin:0 5px}
 .window-control.close:hover{background:#b74349;color:white}
@@ -69,7 +69,7 @@ a{color:#75d9c7}
 <div class="window-bar">
   <div class="brand" data-wry-darg-region id="titleDrag"><span class="badge"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4V2m-2 0h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="5" y="8" width="22" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M2.5 14v6M29.5 14v6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16" r="1.8" fill="currentColor"/><circle cx="20" cy="16" r="1.8" fill="currentColor"/><path d="M12 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div class="brand-copy"><h1>Aalu</h1><small id="sub">AI Companion · Alt+Space</small></div></div>
   <div class="toolbar">
-    <button class="icon" id="callBtn" title="Start voice call" aria-label="Start voice call"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg></button>
+    <button class="icon" id="callBtn" title="Start voice call" aria-label="Start voice call"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg></button><span class="voice-wave" id="voiceWave" aria-label="Aalu is speaking"><i></i><i></i><i></i><i></i></span>
     <button class="icon" id="newBtn" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button>
     <button class="icon" id="keyBtn" title="API keys" aria-label="API keys"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.5.9l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.6-1.4-2.4 1.4-1.1a8 8 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.5-.9l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.5.9l1.7-.6 1.4 2.4-1.4 1.1a8 8 0 0 1 0 1.8Z"/></svg></button>
     <span class="window-divider"></span>
@@ -89,8 +89,8 @@ a{color:#75d9c7}
 <div class="key"><label for="k-gemini">Gemini <span id="s-gemini">not set</span></label><div class="r"><input id="k-gemini" type="password" placeholder="Paste key" autocomplete="off"><button class="save" data-p="gemini">Save</button></div></div>
 <button class="closep" id="closeP">Done</button></div></div>
 <script>
-const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),translateBtn=$('translateBtn'),screen=$('screen'),panel=$('panel'),welcome=$('welcome'),callBtn=$('callBtn');
-let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false;
+const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),translateBtn=$('translateBtn'),screen=$('screen'),panel=$('panel'),welcome=$('welcome'),callBtn=$('callBtn'),voiceWave=$('voiceWave');
+let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false,micReady=false;
 const post=o=>window.ipc.postMessage(JSON.stringify(o));
 document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',()=>post({t:'window',action:button.dataset.window})));
 $('closeWindow').addEventListener('click',()=>post({t:'close'}));
@@ -138,7 +138,7 @@ window.__ai={
 };
 function send(fromVoice=false){
   const text=input.value.trim();if(!text||busy)return;
-  const mode=screen.value;
+  const mode=fromVoice?'':screen.value;
   box.querySelector(".welcome")?.remove();
   add('bubble user',text);
   pending=add('note dots',fromVoice?'Thinking · voice call':mode?'Reading your screen':'Thinking');
@@ -154,10 +154,33 @@ function translate(){
   input.value='';input.style.height='auto';
   setBusy(true);post({t:'translate',text});
 }
-function setVoiceState(active){voiceActive=active;callBtn.classList.toggle('active',active);callBtn.title=active?'End voice call':'Start voice call';callBtn.setAttribute('aria-label',callBtn.title);post({t:'voice-state',active})}
-function stopVoice(showNote=true){setVoiceState(false);voiceReplyPending=false;if(recognition){try{recognition.abort()}catch(e){}recognition=null}if(window.speechSynthesis)speechSynthesis.cancel();if(showNote)add('note','Voice call ended')}
-function startListening(){if(!voiceActive||voiceReplyPending||busy)return;const API=window.SpeechRecognition||window.webkitSpeechRecognition;if(!API){add('bubble err','Speech recognition is unavailable in this WebView2 runtime.');stopVoice(false);return}const rec=new API();recognition=rec;rec.lang='en-IN';rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;rec.onstart=()=>add('note','Listening · speak now');rec.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)text+=e.results[i][0].transcript;if(text.trim()&&voiceActive){voiceReplyPending=true;input.value=text.trim();rec.stop();send(true)}};rec.onerror=e=>{if(!voiceActive||e.error==='aborted'||e.error==='no-speech')return;add('bubble err',e.error==='not-allowed'?'Microphone permission was denied. Allow microphone access for AI Companion and try again.':'Speech recognition failed: '+e.error);stopVoice(false)};rec.onend=()=>{if(recognition===rec)recognition=null;if(voiceActive&&!voiceReplyPending&&!busy)setTimeout(startListening,350)};try{rec.start()}catch(e){recognition=null;if(voiceActive)setTimeout(startListening,500)}}
-function speakReply(text){if(!voiceActive)return;if(!window.SpeechSynthesisUtterance||!window.speechSynthesis){add('bubble err','Speech playback is unavailable on this system.');stopVoice(false);return}const u=new SpeechSynthesisUtterance(text);u.lang=/[\u0900-\u097F]/.test(text)?'hi-IN':'en-IN';u.onend=()=>{voiceReplyPending=false;if(voiceActive)setTimeout(startListening,300)};u.onerror=()=>{voiceReplyPending=false;if(voiceActive)setTimeout(startListening,500)};speechSynthesis.cancel();speechSynthesis.speak(u)}
+function setVoiceState(active){voiceActive=active;document.body.classList.toggle('voice-active',active);callBtn.classList.toggle('active',active);callBtn.title=active?'End voice call (Esc)':'Start voice call';callBtn.setAttribute('aria-label',callBtn.title);callBtn.innerHTML=active?'<svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19a19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.5 2.8a2 2 0 0 1-.6 1.7L7.1 10a16 16 0 0 0 6 6l1.8-1.9a2 2 0 0 1 1.7-.6l2.8.5a2 2 0 0 1 1.6 1.9Z"/><path d="m3 3 18 18"/></svg>':'<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg>';if(!active)voiceWave.classList.remove('speaking');post({t:'voice-state',active})}
+function stopVoice(showNote=true){setVoiceState(false);voiceWave.classList.remove('speaking');voiceReplyPending=false;if(recognition){try{recognition.abort()}catch(e){}recognition=null}if(window.speechSynthesis)speechSynthesis.cancel();if(showNote)add('note','Voice call ended')}
+function startListening(){
+  if(!voiceActive||voiceReplyPending||busy)return;
+  if(!micReady){
+    if(!navigator.mediaDevices?.getUserMedia){add('bubble err','This WebView2 page cannot access the microphone.');stopVoice(false);return}
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+      stream.getTracks().forEach(track=>track.stop());
+      micReady=true;
+      startListening();
+    }).catch(error=>{
+      const detail=error.name==='NotAllowedError'?'Windows or WebView2 denied microphone access. Check Settings → Privacy & security → Microphone, then restart Aalu.':error.name==='NotFoundError'?'Windows did not find an available microphone.':'Microphone access failed: '+error.name;
+      add('bubble err',detail);stopVoice(false);
+    });
+    return;
+  }
+  const API=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!API){add('bubble err','The microphone is available, but speech recognition is unavailable in this WebView2 runtime.');stopVoice(false);return}
+  voiceWave.classList.remove('speaking');const rec=new API();recognition=rec;rec.lang='en-IN';rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
+  rec.onstart=()=>add('note','Listening · speak now');
+  rec.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)text+=e.results[i][0].transcript;if(text.trim()&&voiceActive){voiceReplyPending=true;input.value=text.trim();rec.stop();send(true)}};
+  rec.onerror=e=>{if(!voiceActive||e.error==='aborted'||e.error==='no-speech')return;add('bubble err',e.error==='not-allowed'?'Windows granted microphone access, but Edge speech recognition refused it. Check Edge speech-recognition policy and internet access.':'Speech recognition failed: '+e.error);stopVoice(false)};
+  rec.onend=()=>{if(recognition===rec)recognition=null;if(voiceActive&&!voiceReplyPending&&!busy)setTimeout(startListening,350)};
+  try{rec.start()}catch(e){recognition=null;if(voiceActive)setTimeout(startListening,500)}
+}
+function pickVoice(lang){const voices=speechSynthesis.getVoices();const prefix=lang.toLowerCase().startsWith('hi')?'hi':'en-in';const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(prefix));const preferred=matches.find(v=>/natural|neural|aria|jenny|priya|neerja|heera/i.test(v.name));return preferred||matches[0]||voices.find(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()))||null}
+function speakReply(text){if(!voiceActive)return;if(!window.SpeechSynthesisUtterance||!window.speechSynthesis){add('bubble err','Speech playback is unavailable on this system.');stopVoice(false);return}const u=new SpeechSynthesisUtterance(text);u.lang=/[\u0900-\u097F]/.test(text)?'hi-IN':'en-IN';const voice=pickVoice(u.lang);if(voice)u.voice=voice;u.rate=.94;u.pitch=1.03;voiceWave.classList.add('speaking');u.onend=()=>{voiceWave.classList.remove('speaking');voiceReplyPending=false;if(voiceActive)setTimeout(startListening,300)};u.onerror=()=>{voiceWave.classList.remove('speaking');voiceReplyPending=false;if(voiceActive)setTimeout(startListening,500)};speechSynthesis.cancel();speechSynthesis.speak(u)}
 function toggleVoice(){if(voiceActive){stopVoice();return}const API=window.SpeechRecognition||window.webkitSpeechRecognition;if(!API){add('bubble err','Speech recognition is unavailable in this WebView2 runtime.');return}setVoiceState(true);add('note','Voice call started · speak after the listening indicator');setTimeout(startListening,250)}
 window.__voice={toggle:toggleVoice};
 window.addEventListener('beforeunload',()=>{if(recognition)try{recognition.abort()}catch(e){}if(window.speechSynthesis)speechSynthesis.cancel()});
@@ -174,6 +197,6 @@ $('closeP').onclick=()=>{panel.classList.remove('open');input.focus()};
 document.querySelectorAll('.save').forEach(b=>b.onclick=()=>{
   const p=b.dataset.p,i=$('k-'+p);const key=i.value.trim();if(!key)return;post({t:'key',provider:p,key});i.value='';
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(panel.classList.contains('open'))panel.classList.remove('open');else post({t:'close'})}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(voiceActive){stopVoice();return}if(panel.classList.contains('open'))panel.classList.remove('open');else post({t:'close'})}});
 post({t:'ready'});
 </script></body></html>
