@@ -1,64 +1,103 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Companion</title><style>
-:root{font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:#27334c;background:#f6f8fc;--accent:#647eeb;--line:#e5eaf3;--muted:#71809c}
+:root{font:14px/1.5 "Segoe UI",system-ui,sans-serif;color:#e4ebf2;background:#111820;--accent:#48cbb2;--accent-hover:#5addc2;--line:#2b3744;--muted:#91a0af;--ink:#e8eef4;--surface:#18222c;--surface-2:#202c37}
 *{box-sizing:border-box}
-html,body{height:100%}body{margin:0;display:flex;flex-direction:column;overflow:hidden}
-header{padding:12px 14px 12px 18px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
-.badge{font-size:24px}header div.t{flex:1;min-width:0}h1{font-size:16px;margin:0;line-height:1.2}
-small{color:var(--muted);font-size:12px}
-.icon{border:0;background:transparent;color:var(--muted);font-size:17px;width:34px;height:34px;border-radius:10px;cursor:pointer}
-.icon:hover{background:#eef2fb;color:var(--accent)}
-.messages{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
-.bubble{max-width:90%;padding:11px 14px;border-radius:16px;background:#fff;box-shadow:0 2px 10px #30476c0c;white-space:pre-wrap;word-wrap:break-word;user-select:text}
+html,body{height:100%}body{margin:0;display:flex;flex-direction:column;overflow:hidden;background:#111820;color:var(--ink)}
+.window-bar{height:56px;flex:none;padding:0 8px 0 14px;background:#151d25;border-bottom:1px solid #2a3540;display:flex;align-items:center;gap:8px;user-select:none}
+.brand{height:100%;display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding-left:4px}
+.brand[data-wry-darg-region]{app-region:drag}
+.badge{width:31px;height:31px;flex:none;display:grid;place-items:center;font-size:10px;font-weight:750;letter-spacing:.04em;color:#08211d;background:#5dd8c0;border-radius:10px}
+.badge svg{width:23px;height:23px;display:block}
+.brand-copy{min-width:0}.brand h1{font-size:14px;letter-spacing:.1px;margin:0;line-height:1.25;color:#edf3f8;font-weight:650}
+.brand small{display:block;color:#98a7b6;font-size:11px;line-height:1.25;margin-top:2px}
+.toolbar{height:100%;display:flex;align-items:center;gap:2px;flex:none}
+.icon,.window-control{border:0;background:transparent;color:#9cabb9;width:34px;height:34px;display:grid;place-items:center;border-radius:8px;cursor:pointer}
+.icon.active{background:#7e2632;color:#fff}.icon:hover,.window-control:hover{background:#25313c;color:#edf4f8}
+.icon svg,.window-control svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.window-divider{height:20px;width:1px;background:#34414e;margin:0 5px}
+.window-control.close:hover{background:#b74349;color:white}
+.messages{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:22px 20px;display:flex;flex-direction:column;gap:13px;scroll-behavior:smooth;background:radial-gradient(ellipse at 50% 0%,#1b2832 0%,#141c24 52%,#111820 100%)}
+.messages::-webkit-scrollbar{display:none;width:0;height:0}
+.welcome{margin:auto;max-width:350px;text-align:center;padding:24px 18px;color:var(--ink)}
+.welcome-mark{width:44px;height:44px;margin:0 auto 16px;border-radius:14px;display:grid;place-items:center;background:#203b39;color:#70dfc9;font-size:11px;font-weight:750;letter-spacing:.04em;border:1px solid #2a5b53}
+.welcome-mark svg{width:30px;height:30px;display:block}
+.welcome h2{margin:0 0 7px;font-size:21px;line-height:1.25;letter-spacing:-.35px;font-weight:650;color:#edf3f8}
+.welcome p{margin:0 auto;color:#aab6c2;font-size:13px;line-height:1.65}
+.welcome .screen-tip{margin:16px auto 0;padding:10px 13px;border:1px solid #2a3743;border-radius:11px;background:#18222c;color:#94a3b1;font-size:12px;line-height:1.5}
+.bubble{max-width:88%;padding:11px 14px;border:1px solid #2c3946;border-radius:14px;background:#1b2630;box-shadow:0 4px 12px #00000014;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;color:#e1e8ef}
 .bubble.bot{align-self:flex-start;border-top-left-radius:5px}
-.bubble.user{align-self:flex-end;background:#e5edff;border-top-right-radius:5px}
-.bubble.err{align-self:flex-start;background:#fff1f0;color:#8a2c22;border:1px solid #f3c9c4}
-.note{align-self:center;max-width:94%;font-size:12px;color:var(--muted);text-align:center;white-space:pre-wrap}
-.meta{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--muted);white-space:normal}
-.copy{border:1px solid var(--line);background:#fff;color:var(--accent);border-radius:8px;padding:2px 10px;font:inherit;font-size:12px;cursor:pointer}
-.copy:hover{background:#eef2fb}
+.bubble.user{align-self:flex-end;background:#1b3733;border-color:#28564e;border-top-right-radius:5px;color:#dff7f1}
+.bubble.err{align-self:flex-start;background:#352322;color:#ffd5d1;border-color:#673b38}
+.translation-card{width:min(100%,520px);max-width:100%;padding:15px 16px}
+.translation-title{margin-bottom:8px;color:#6bddc8;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.translation-text{color:#edf3f8;font-size:15px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.grammar-note{margin-top:12px;padding:10px 12px;border-left:3px solid #4bbda8;border-radius:0 9px 9px 0;background:#202d36;color:#bdc8d1;font-size:12px;line-height:1.55}
+.grammar-note strong{color:#e0e8ee}
+.note{align-self:center;max-width:94%;font-size:12px;color:#9aa9b7;text-align:center;white-space:pre-wrap}
+.meta{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:11px;color:#91a0af;white-space:normal}
+.copy{border:1px solid #364550;background:#202c36;color:#82dece;border-radius:8px;padding:3px 10px;font:inherit;font-size:11px;cursor:pointer}
+.copy:hover{background:#263a40}
 .dots::after{content:"...";animation:b 1s steps(4,end) infinite;display:inline-block;width:1.2em;overflow:hidden;vertical-align:bottom}
 @keyframes b{0%{width:0}100%{width:1.2em}}
-.composer{padding:10px 14px 14px;background:#fff;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
-.row{display:flex;gap:8px;align-items:flex-end}
-select{font:inherit;font-size:13px;color:var(--muted);border:1px solid #dce3ef;border-radius:10px;padding:5px 8px;background:#fff;align-self:flex-start}
-select.on{color:#fff;background:var(--accent);border-color:var(--accent)}
-textarea{min-width:0;flex:1;resize:none;border:1px solid #dce3ef;border-radius:12px;padding:10px 12px;font:inherit;max-height:110px;outline:none}
-textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #647eeb22}
-.send{border:0;border-radius:12px;background:var(--accent);color:#fff;padding:0 18px;height:42px;font:inherit;font-weight:600;cursor:pointer}
-.send:disabled{opacity:.5;cursor:default}
-.panel{position:fixed;inset:0;background:#27334c66;display:none;align-items:center;justify-content:center;padding:16px}
+.composer{flex:none;padding:11px 14px 13px;background:#151e27;border-top:1px solid #2b3744;display:flex;flex-direction:column;gap:9px}
+.context-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.context-label{font-size:10px;color:#8796a5;letter-spacing:.08em;text-transform:uppercase;font-weight:650}
+select{max-width:100%;font:inherit;font-size:11px;color:#c0cbd5;border:1px solid #35434f;border-radius:8px;padding:5px 9px;background:#1b2630;outline:none}
+select:focus{border-color:#489f91}
+select.on{color:#eafffa;background:#254d45;border-color:#387b6f}
+textarea{display:block;width:100%;min-width:0;resize:none;border:1px solid #34424e;border-radius:11px;padding:10px 12px;font:inherit;font-size:13px;max-height:110px;outline:none;background:#10171e;color:#e5edf4;transition:border-color .15s,box-shadow .15s}
+textarea::placeholder{color:#71808e}
+textarea:focus,input:focus{border-color:#4cae9d;box-shadow:0 0 0 3px #48cbb21c;background:#111a21}
+.action-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.translate{border:1px solid #3a514e;border-radius:9px;background:#1b2a2b;color:#82d9c9;padding:0 13px;height:36px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.translate:hover{background:#223734;border-color:#4e8077}.translate:disabled{opacity:.5;cursor:default}
+.send{border:0;border-radius:9px;background:#43bca6;color:#07221d;padding:0 18px;height:36px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.send:hover{background:#5bd3bd}.send:disabled{opacity:.5;cursor:default}
+.panel{position:fixed;inset:0;background:#080d12bd;display:none;align-items:center;justify-content:center;padding:16px}
 .panel.open{display:flex}
-.card{background:#fff;border-radius:16px;padding:18px;width:100%;max-width:380px;box-shadow:0 10px 40px #0003}
-.card h2{margin:0 0 4px;font-size:16px}.card p{margin:0 0 12px;font-size:12.5px;color:var(--muted)}
-.key{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
-.key label{font-size:13px;font-weight:600;display:flex;justify-content:space-between}
-.key label span{font-weight:400;color:var(--muted)}.key label span.ok{color:#2f8f5b}
+.card{background:#1a242e;border:1px solid #35424f;border-radius:15px;padding:20px;width:100%;max-width:380px;box-shadow:0 16px 48px #0008;color:#e6edf3}
+.card h2{margin:0 0 4px;font-size:16px}.card p{margin:0 0 14px;font-size:12px;color:#9eacb9}
+.key{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.key label{font-size:12px;font-weight:600;display:flex;justify-content:space-between}
+.key label span{font-weight:400;color:#9eacb9}.key label span.ok{color:#6bd7a6}
 .key .r{display:flex;gap:6px}
-input{min-width:0;flex:1;border:1px solid #dce3ef;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;outline:none}
-.save{border:0;border-radius:10px;background:var(--accent);color:#fff;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.closep{margin-top:4px;width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px;font:inherit;cursor:pointer}
-a{color:var(--accent)}
+input{min-width:0;flex:1;border:1px solid #35434f;border-radius:9px;padding:8px 10px;font:inherit;font-size:12px;outline:none;background:#111920;color:#e8eef4}
+.save{border:0;border-radius:9px;background:#43bca6;color:#07221d;padding:0 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.closep{margin-top:4px;width:100%;border:1px solid #394651;background:#202b35;color:#dbe3e9;border-radius:9px;padding:8px;font:inherit;cursor:pointer}
+a{color:#75d9c7}
 </style><body>
-<header><span class="badge">🤖</span><div class="t"><h1>Your AI Companion</h1><small id="sub">Ready</small></div>
-<button class="icon" id="newBtn" title="New chat" aria-label="New chat">↺</button>
-<button class="icon" id="keyBtn" title="API keys" aria-label="API keys">⚙</button></header>
-<main class="messages" id="messages"><div class="bubble bot">Hi! Ask me anything, in English or Hinglish. To work on what is on your screen, pick “Read screen (text)” below before you send.</div></main>
+<div class="window-bar">
+  <div class="brand" data-wry-darg-region id="titleDrag"><span class="badge"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4V2m-2 0h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="5" y="8" width="22" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M2.5 14v6M29.5 14v6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16" r="1.8" fill="currentColor"/><circle cx="20" cy="16" r="1.8" fill="currentColor"/><path d="M12 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div class="brand-copy"><h1>Aalu</h1><small id="sub">AI Companion · Alt+Space</small></div></div>
+  <div class="toolbar">
+    <button class="icon" id="callBtn" title="Start voice call" aria-label="Start voice call"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg></button>
+    <button class="icon" id="newBtn" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button>
+    <button class="icon" id="keyBtn" title="API keys" aria-label="API keys"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.5.9l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.6-1.4-2.4 1.4-1.1a8 8 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.5-.9l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.5.9l1.7-.6 1.4 2.4-1.4 1.1a8 8 0 0 1 0 1.8Z"/></svg></button>
+    <span class="window-divider"></span>
+    <button class="window-control" data-window="minimize" title="Minimize" aria-label="Minimize"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="window-control" data-window="maximize" title="Maximize or restore" aria-label="Maximize or restore"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></button>
+    <button class="window-control close" id="closeWindow" title="Close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+  </div>
+</div>
+<main class="messages" id="messages"><section class="welcome" id="welcome"><div class="welcome-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4V2m-2 0h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="5" y="8" width="22" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M2.5 14v6M29.5 14v6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16" r="1.8" fill="currentColor"/><circle cx="20" cy="16" r="1.8" fill="currentColor"/><path d="M12 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h2>What can I help with?</h2><p>Ask a question or tell me what you are working on.</p><div class="screen-tip">To get help with your screen, choose <b>Read screen (text)</b> below.</div></section></main>
 <form class="composer" id="form">
-<select id="screen" aria-label="Screen"><option value="">No screen</option><option value="text">Read screen (text)</option><option value="image">Look at screen (image)</option></select>
-<div class="row"><textarea id="input" rows="1" placeholder="Type a message…" aria-label="Message" autofocus></textarea><button class="send" id="send">Send</button></div></form>
+<div class="context-row"><label class="context-label" for="screen">Screen context</label><select id="screen" aria-label="Screen"><option value="">No screen</option><option value="text">Read screen (text)</option><option value="image">Look at screen (image)</option></select></div>
+<textarea id="input" rows="1" placeholder="Type a message…" aria-label="Message" autofocus></textarea>
+<div class="action-row"><button class="translate" id="translateBtn" type="button">Translate with AI</button><button class="send" id="send">Send</button></div></form>
 <div class="panel" id="panel"><div class="card" role="dialog" aria-label="API keys">
-<h2>API keys</h2><p>Free keys: Groq at console.groq.com, Gemini at aistudio.google.com. Keys are saved in Windows Credential Manager, never in a file.</p>
-<div class="key"><label for="k-groq">Groq <span id="s-groq">not set</span></label><div class="r"><input id="k-groq" type="password" placeholder="Paste key" autocomplete="off"><button class="save" data-p="groq">Save</button></div></div>
+<h2>API keys</h2><p>API keys are stored in Windows Credential Manager and are never written to a file.</p>
+
 <div class="key"><label for="k-gemini">Gemini <span id="s-gemini">not set</span></label><div class="r"><input id="k-gemini" type="password" placeholder="Paste key" autocomplete="off"><button class="save" data-p="gemini">Save</button></div></div>
 <button class="closep" id="closeP">Done</button></div></div>
 <script>
-const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),screen=$('screen'),panel=$('panel');
-let busy=false,cur=null,curText='',pending=null,firstState=true;
+const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),translateBtn=$('translateBtn'),screen=$('screen'),panel=$('panel'),welcome=$('welcome'),callBtn=$('callBtn');
+let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false;
 const post=o=>window.ipc.postMessage(JSON.stringify(o));
+document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',()=>post({t:'window',action:button.dataset.window})));
+$('closeWindow').addEventListener('click',()=>post({t:'close'}));
+$('titleDrag').addEventListener('mousedown',e=>{if(e.button===0){post({t:'window',action:e.detail===2?'maximize':'drag'})}});
 const down=()=>{box.scrollTop=box.scrollHeight};
 function add(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;box.appendChild(d);down();return d}
-function setBusy(v){busy=v;sendBtn.disabled=v;if(!v)input.focus()}
+function setBusy(v){busy=v;sendBtn.disabled=v;translateBtn.disabled=v;if(!v)input.focus()}
 function copy(text,btn){
   let ok=false;const t=document.createElement('textarea');t.value=text;t.style.cssText='position:fixed;opacity:0';document.body.appendChild(t);t.select();
   try{ok=document.execCommand('copy')}catch(e){}t.remove();
@@ -69,7 +108,17 @@ function endPending(){if(pending){pending.remove();pending=null}}
 window.__ai={
   token(text){endPending();if(!cur){cur=add('bubble bot','');curText=''}curText+=text;cur.textContent=curText;down()},
   notice(text){add('note',text)},
-  error(text){endPending();if(cur&&!curText){cur.remove()}cur=null;curText='';add('bubble err',text);setBusy(false)},
+  translationResult(result,source,grammarNote){
+    endPending();
+    const card=document.createElement('article');card.className='bubble bot translation-card';
+    const title=document.createElement('div');title.className='translation-title';title.textContent=source==='english'?'Corrected English':'English translation';card.appendChild(title);
+    const output=document.createElement('div');output.className='translation-text';output.textContent=result;card.appendChild(output);
+    const meta=document.createElement('div');meta.className='meta';
+    const button=document.createElement('button');button.type='button';button.className='copy';button.textContent=source==='english'?'Copy corrected text':'Copy translation';button.onclick=()=>copy(result,button);meta.appendChild(button);card.appendChild(meta);
+    if(source==='english'&&grammarNote){const note=document.createElement('div');note.className='grammar-note';const label=document.createElement('strong');label.textContent='Grammar note';note.append(label,document.createTextNode(' '+grammarNote));card.appendChild(note)}
+    box.appendChild(card);down();setBusy(false);
+  },
+  error(text){endPending();if(cur&&!curText){cur.remove()}cur=null;curText='';add('bubble err',text);setBusy(false);if(voiceActive)stopVoice(false)},
   done(info){
     endPending();
     if(cur){
@@ -78,29 +127,48 @@ window.__ai={
       const s=document.createElement('span');s.textContent='via '+info.provider;m.append(b,s);cur.appendChild(m);
     }
     if(info.warning)add('note',info.warning);
-    cur=null;curText='';setBusy(false);down();
+    const reply=curText;cur=null;curText='';setBusy(false);down();if(voiceActive&&reply.trim())speakReply(reply);
   },
   state(s){
-    $('sub').textContent=s.hotkey?('Press '+s.hotkey+' to open'):'No global shortcut';
-    for(const p of ['groq','gemini']){const e=$('s-'+p);e.textContent=s[p]?'✓ saved':'not set';e.className=s[p]?'ok':''}
-    if(firstState&&!s.groq&&!s.gemini)panel.classList.add('open');
+    $('sub').textContent='AI Companion · '+(s.hotkey?s.hotkey+' to toggle':'Shortcut unavailable');
+    const e=$('s-gemini');e.textContent=s.gemini?'Saved':'Not set';e.className=s.gemini?'ok':''
+    if(firstState&&!s.gemini)panel.classList.add('open');
     firstState=false;
   }
 };
-function send(){
+function send(fromVoice=false){
   const text=input.value.trim();if(!text||busy)return;
   const mode=screen.value;
+  box.querySelector(".welcome")?.remove();
   add('bubble user',text);
-  pending=add('note dots',mode?'Reading your screen':'Thinking');
+  pending=add('note dots',fromVoice?'Thinking · voice call':mode?'Reading your screen':'Thinking');
   input.value='';input.style.height='auto';
   screen.value='';screen.className='';  // the screen is read for this one message only
   setBusy(true);post({t:'send',text,screen:mode});
 }
+function translate(){
+  const text=input.value.trim();if(!text||busy)return;
+  box.querySelector('.welcome')?.remove();
+  add('bubble user',text);
+  pending=add('note dots','Translating and checking grammar');
+  input.value='';input.style.height='auto';
+  setBusy(true);post({t:'translate',text});
+}
+function setVoiceState(active){voiceActive=active;callBtn.classList.toggle('active',active);callBtn.title=active?'End voice call':'Start voice call';callBtn.setAttribute('aria-label',callBtn.title);post({t:'voice-state',active})}
+function stopVoice(showNote=true){setVoiceState(false);voiceReplyPending=false;if(recognition){try{recognition.abort()}catch(e){}recognition=null}if(window.speechSynthesis)speechSynthesis.cancel();if(showNote)add('note','Voice call ended')}
+function startListening(){if(!voiceActive||voiceReplyPending||busy)return;const API=window.SpeechRecognition||window.webkitSpeechRecognition;if(!API){add('bubble err','Speech recognition is unavailable in this WebView2 runtime.');stopVoice(false);return}const rec=new API();recognition=rec;rec.lang='en-IN';rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;rec.onstart=()=>add('note','Listening · speak now');rec.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)text+=e.results[i][0].transcript;if(text.trim()&&voiceActive){voiceReplyPending=true;input.value=text.trim();rec.stop();send(true)}};rec.onerror=e=>{if(!voiceActive||e.error==='aborted'||e.error==='no-speech')return;add('bubble err',e.error==='not-allowed'?'Microphone permission was denied. Allow microphone access for AI Companion and try again.':'Speech recognition failed: '+e.error);stopVoice(false)};rec.onend=()=>{if(recognition===rec)recognition=null;if(voiceActive&&!voiceReplyPending&&!busy)setTimeout(startListening,350)};try{rec.start()}catch(e){recognition=null;if(voiceActive)setTimeout(startListening,500)}}
+function speakReply(text){if(!voiceActive)return;if(!window.SpeechSynthesisUtterance||!window.speechSynthesis){add('bubble err','Speech playback is unavailable on this system.');stopVoice(false);return}const u=new SpeechSynthesisUtterance(text);u.lang=/[\u0900-\u097F]/.test(text)?'hi-IN':'en-IN';u.onend=()=>{voiceReplyPending=false;if(voiceActive)setTimeout(startListening,300)};u.onerror=()=>{voiceReplyPending=false;if(voiceActive)setTimeout(startListening,500)};speechSynthesis.cancel();speechSynthesis.speak(u)}
+function toggleVoice(){if(voiceActive){stopVoice();return}const API=window.SpeechRecognition||window.webkitSpeechRecognition;if(!API){add('bubble err','Speech recognition is unavailable in this WebView2 runtime.');return}setVoiceState(true);add('note','Voice call started · speak after the listening indicator');setTimeout(startListening,250)}
+window.__voice={toggle:toggleVoice};
+window.addEventListener('beforeunload',()=>{if(recognition)try{recognition.abort()}catch(e){}if(window.speechSynthesis)speechSynthesis.cancel()});
+callBtn.addEventListener('click',toggleVoice);
+
 $('form').addEventListener('submit',e=>{e.preventDefault();send()});
+translateBtn.addEventListener('click',translate);
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
 input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,110)+'px'});
 screen.addEventListener('change',()=>{screen.className=screen.value?'on':''});
-$('newBtn').onclick=()=>{if(busy)return;post({t:'new'});box.textContent='';add('bubble bot','New chat. What can I help with?');input.focus()};
+$('newBtn').onclick=()=>{if(busy)return;post({t:'new'});box.textContent='';if(welcome)box.appendChild(welcome);input.focus()};
 $('keyBtn').onclick=()=>panel.classList.add('open');
 $('closeP').onclick=()=>{panel.classList.remove('open');input.focus()};
 document.querySelectorAll('.save').forEach(b=>b.onclick=()=>{

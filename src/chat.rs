@@ -17,10 +17,31 @@ pub enum ScreenMode {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum WindowAction {
+    Minimize,
+    Maximize,
+    Drag,
+}
+
+pub fn parse_window_action(body: &str) -> Option<WindowAction> {
+    let value: Value = serde_json::from_str(body).ok()?;
+    if value["t"].as_str()? != "window" {
+        return None;
+    }
+    match value["action"].as_str()? {
+        "minimize" => Some(WindowAction::Minimize),
+        "maximize" => Some(WindowAction::Maximize),
+        "drag" => Some(WindowAction::Drag),
+        _ => None,
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ChatIpc {
     Ready,
     Close,
     NewChat,
+    Translate { text: String },
     Send { text: String, screen: ScreenMode },
     SetKey { provider: String, key: String },
 }
@@ -32,6 +53,13 @@ pub fn parse_ipc(body: &str) -> Option<ChatIpc> {
         "ready" => Some(ChatIpc::Ready),
         "close" => Some(ChatIpc::Close),
         "new" => Some(ChatIpc::NewChat),
+        "translate" => {
+            let text: String = value["text"].as_str()?.trim().chars().take(MAX_TEXT_CHARS).collect();
+            if text.is_empty() {
+                return None;
+            }
+            Some(ChatIpc::Translate { text })
+        }
         "send" => {
             let text: String = value["text"].as_str()?.trim().chars().take(MAX_TEXT_CHARS).collect();
             if text.is_empty() {
@@ -93,6 +121,14 @@ pub fn js_error(text: &str) -> String {
     format!("window.__ai.error({})", js_str(text))
 }
 
+pub fn js_translation_result(result: &str, source: &str, grammar_note: &str) -> String {
+    format!(
+        "window.__ai.translationResult({},{},{})",
+        js_str(result),
+        js_str(source),
+        js_str(grammar_note)
+    )
+}
 pub fn js_done(provider: &str, model: &str, warning: Option<&str>) -> String {
     format!(
         "window.__ai.done({{provider:{},model:{},warning:{}}})",

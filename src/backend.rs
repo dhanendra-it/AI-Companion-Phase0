@@ -100,6 +100,7 @@ impl Backend {
                     Err(error) => (self.emit)(Out::Js(chat::js_error(&format!("Could not save the key: {error}")))),
                 }
             }
+            ChatIpc::Translate { text } => self.start_translate(text),
             ChatIpc::Send { text, screen } => self.start_send(text, screen),
         }
     }
@@ -107,6 +108,49 @@ impl Backend {
     fn send_state(&self) {
         let has = |name: &str| (self.deps.key_get)(name).is_some();
         (self.emit)(Out::Js(chat::js_state(&self.hotkey, has("groq"), has("gemini"))));
+    }
+
+    fn start_translate(&self, text: String) {
+        if self.busy.swap(true, Ordering::SeqCst) {
+            (self.emit)(Out::Js(chat::js_error("Wait for the current request to finish.")));
+            return;
+        }
+        let guard = BusyGuard(self.busy.clone());
+        let mut cfg = (*self.cfg).clone();
+        cfg.system_prompt = "You are a careful translation and English grammar assistant. Return exactly one JSON object and no markdown, with string fields: source ('english', 'hindi', 'hinglish', or 'other'), result, grammar_note. If the input is primarily English, correct grammar, spelling, and punctuation while preserving the user's meaning and wording as much as possible; put the corrected English in result and explain any meaningful fixes briefly in Hindi/Hinglish in grammar_note. If the English needs no meaningful correction, say so briefly in grammar_note. If the input is Hindi or Hinglish, translate it into natural English; put only that translation in result and leave grammar_note empty. For other languages, translate naturally into English and leave grammar_note empty. Preserve names and intent. Never use emojis.".into();
+        let deps = self.deps;
+        let emit = self.emit.clone();
+        thread::spawn(move || {
+            let _guard = guard;
+            let key_for = |name: &str| (deps.key_get)(name);
+            let result = ai::chat(
+                &cfg,
+                &[Msg::user(text)],
+                None,
+                &key_for,
+                &mut |_| {},
+                &mut |_| {},
+            );
+            match result {
+                Ok(reply) => {
+                    let value = serde_json::from_str::<serde_json::Value>(reply.text.trim())
+                        .or_else(|_| {
+                            let trimmed = reply.text.trim().trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
+                            serde_json::from_str::<serde_json::Value>(trimmed)
+                        });
+                    let (result, source, note) = match value {
+                        Ok(value) => (
+                            value["result"].as_str().unwrap_or(reply.text.trim()).to_string(),
+                            value["source"].as_str().unwrap_or("other").to_string(),
+                            value["grammar_note"].as_str().unwrap_or("").to_string(),
+                        ),
+                        Err(_) => (reply.text.trim().to_string(), "other".to_string(), String::new()),
+                    };
+                    emit(Out::Js(chat::js_translation_result(&result, &source, &note)));
+                }
+                Err(error) => emit(Out::Js(chat::js_error(&format!("Translation failed: {error}")))),
+            }
+        });
     }
 
     fn start_send(&self, text: String, screen: ScreenMode) {

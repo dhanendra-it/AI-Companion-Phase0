@@ -2,126 +2,849 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Robot Companion</title>
 <style>
-  * { box-sizing: border-box; }
-  html, body {
-    width: 100%; height: 100%; margin: 0; padding: 0;
-    overflow: hidden; background: transparent !important;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#companion {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 155px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#companion:active {
+  cursor: grabbing;
+}
+
+svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: visible;
+}
+
+#callAction{display:none;position:absolute;bottom:5px;left:50%;transform:translateX(-50%);padding:6px 13px;border:1px solid #e45d69;border-radius:999px;background:#b83242;color:#fff;font:600 12px system-ui;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px #0006}
+#callAction.visible{display:block}
+/* ==================== PROCEDURAL ANIMATIONS ==================== */
+.robot {
+  transform-origin: 50% 50%;
+  animation: rootFloat 3.8s ease-in-out infinite;
+  filter: drop-shadow(0 6px 10px rgba(8, 14, 28, 0.45));
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#companion:hover .robot {
+  filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.35)) drop-shadow(0 6px 12px rgba(8, 14, 28, 0.55));
+}
+
+.robot-motion {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: headBob 3.8s ease-in-out infinite;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shoe{transform-box:fill-box;transform-origin:50% 0%;}
+.shoe.fidget{animation:shoeFidget .62s cubic-bezier(.25,.7,.3,1) both;}
+@keyframes shoeFidget{0%,100%{transform:translateY(0) rotate(0)}18%{transform:translateY(-18px) rotate(-5deg)}42%{transform:translateY(4px) rotate(4deg)}67%{transform:translateY(-11px) rotate(-3deg)}86%{transform:translateY(2px) rotate(2deg)}}
+
+.legs-group {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: legsSway 3.8s ease-in-out infinite;
+  transition: transform 0.3s ease;
+}
+
+.shadow-oval {
+  transform-origin: 100px 188px;
+  animation: shadowPulse 3.8s ease-in-out infinite;
+}
+
+/* Natural idle blinking */
+.eye-idle-rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: idleBlink 4.2s ease-in-out infinite;
+}
+
+/* Headphone cyan LED ring glow */
+.ear-ring {
+  animation: ringPulse 2.2s ease-in-out infinite alternate;
+}
+
+.eye { transform-box: fill-box; transform-origin: center; animation: pastedBlink 5s infinite; }
+.glow,.neon { animation: pastedPulse 2.4s ease-in-out infinite; }
+@keyframes pastedBlink { 0%,94%,100% { transform:scaleY(1); } 97% { transform:scaleY(.08); } }
+@keyframes pastedPulse { 0%,100% { opacity:.85; } 50% { opacity:1; } }
+
+/* ==================== STATE VARIATIONS ==================== */
+.art-face {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 1. IDLE (Default) */
+#companion.idle .face-idle {
+  opacity: 1;
+}
+
+/* 2. HAPPY (Joyful Bouncing & ^_^ Eyes) */
+#companion.happy .face-happy {
+  opacity: 1;
+}
+#companion.happy .robot-motion {
+  animation: happyHeadWiggle 0.45s ease-in-out infinite alternate;
+}
+#companion.happy .robot {
+  animation: happyJump 0.48s ease-in-out 3;
+}
+#companion.happy .cheek-glow {
+  opacity: 0.85;
+}
+
+/* 3. LIGHTNING / EXCITED (⚡ ⚡ Eyes from Reference) */
+#companion.lightning .face-lightning {
+  opacity: 1;
+  animation: electricShimmer 0.2s ease-in-out infinite alternate;
+}
+#companion.lightning .robot-motion {
+  transform: rotate(9deg) translateY(-3px);
+}
+#companion.lightning .neon {
+  animation: ringPulseFast 0.3s ease-in-out infinite alternate;
+}
+
+/* 4. CURIOUS (Tilted Head from Reference Row 1) */
+#companion.curious .face-curious {
+  opacity: 1;
+}
+#companion.curious .robot-motion {
+  transform: rotate(-12deg) translateY(-2px);
+}
+#companion.curious .legs-group {
+  animation: curiousLegTilt 1.1s ease-in-out infinite alternate;
+}
+
+/* 5. GROOVE / MUSIC (Soundwaves & Head Sway) */
+#companion.groove .face-groove {
+  opacity: 1;
+}
+#companion.groove .robot-motion {
+  animation: grooveSway 0.9s ease-in-out infinite alternate;
+}
+#companion.groove .robot {
+  animation: grooveBounce 0.45s ease-in-out infinite alternate;
+}
+#companion.groove .neon {
+  animation: ringPulseFast 0.45s ease-in-out infinite alternate;
+}
+#companion.groove .sound-waves {
+  opacity: 1;
+}
+
+/* 6. LOVE (Cyan Heart Speech Bubble from Reference Row 3) */
+#companion.love .face-love {
+  opacity: 1;
+}
+#companion.love .robot-motion {
+  transform: rotate(-7deg) translateY(-2px);
+}
+#companion.love .heart-bubble {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+#companion.love .cheek-glow {
+  opacity: 0.95;
+}
+
+/* 7. SLEEPING (Closed Slits & Floating Zzz from Reference Row 2) */
+#companion.sleeping .face-sleeping {
+  opacity: 1;
+}
+#companion.sleeping .robot-motion {
+  transform: rotate(5deg) translateY(4px);
+}
+#companion.sleeping .robot {
+  animation: sleepBreathing 4.5s ease-in-out infinite;
+}
+#companion.sleeping .zzz-container {
+  opacity: 1;
+}
+
+/* ==================== KEYFRAMES ==================== */
+@keyframes rootFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes headBob {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50% { transform: rotate(1.2deg) translateY(-1.5px); }
+}
+
+@keyframes legsSway {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(1.5px) scaleY(0.97); }
+}
+
+@keyframes shadowPulse {
+  0%, 100% { transform: scale(1); opacity: 0.38; }
+  50% { transform: scale(0.9); opacity: 0.24; }
+}
+
+@keyframes idleBlink {
+  0%, 92%, 96%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.08); }
+}
+
+@keyframes ringPulse {
+  0% { filter: drop-shadow(0 0 2px #00f0ff) brightness(1); }
+  100% { filter: drop-shadow(0 0 7px #00f0ff) brightness(1.4); }
+}
+
+@keyframes ringPulseFast {
+  0% { filter: drop-shadow(0 0 3px #00f0ff) brightness(1.1); transform: scale(0.96); }
+  100% { filter: drop-shadow(0 0 10px #00f0ff) brightness(1.7); transform: scale(1.08); }
+}
+
+@keyframes happyJump {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  32% { transform: translateY(-13px) rotate(-3deg); }
+  64% { transform: translateY(-4px) rotate(2.5deg); }
+}
+
+@keyframes happyHeadWiggle {
+  0% { transform: rotate(-3.5deg); }
+  100% { transform: rotate(3.5deg); }
+}
+
+@keyframes electricShimmer {
+  0% { filter: drop-shadow(0 0 3px #00f0ff) brightness(1); }
+  100% { filter: drop-shadow(0 0 10px #e0faff) brightness(1.45); }
+}
+
+@keyframes grooveSway {
+  0% { transform: rotate(-8deg) translateY(1.5px); }
+  100% { transform: rotate(8deg) translateY(-1.5px); }
+}
+
+@keyframes grooveBounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-3px); }
+}
+
+@keyframes wavePopRight {
+  0% { opacity: 0; transform: scale(0.7) translateX(0); }
+  50% { opacity: 0.95; }
+  100% { opacity: 0; transform: scale(1.3) translateX(8px); }
+}
+
+@keyframes wavePopLeft {
+  0% { opacity: 0; transform: scale(0.7) translateX(0); }
+  50% { opacity: 0.95; }
+  100% { opacity: 0; transform: scale(1.3) translateX(-8px); }
+}
+
+.wave-r { animation: wavePopRight 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) infinite; }
+.wave-l { animation: wavePopLeft 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) infinite; }
+
+@keyframes heartFloat {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-4px) scale(1.06); }
+}
+
+.heart-bubble {
+  transform-origin: 156px 36px;
+  animation: heartFloat 1.2s ease-in-out infinite alternate;
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes sleepBreathing {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(3px) scale(0.98); }
+}
+
+@keyframes zFloat1 {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  40% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(12px, -20px) scale(1.1); }
+}
+
+@keyframes zFloat2 {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  40% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(16px, -28px) scale(1.3); }
+}
+
+.z-char1 { animation: zFloat1 2.2s ease-out infinite; }
+.z-char2 { animation: zFloat2 2.2s ease-out infinite 0.8s; }
+
+#companion.lightning .robot-motion{animation:excitedTilt .35s ease-in-out infinite alternate}
+#companion.curious .robot-motion{animation:curiousTilt 1.1s ease-in-out infinite alternate}
+#companion.love .robot-motion{animation:loveTilt 1s ease-in-out infinite alternate}
+#companion.sleeping .robot-motion{animation:sleepyNod 4.5s ease-in-out infinite}
+#companion.groove .robot-motion{animation:grooveSway .9s ease-in-out infinite alternate}
+#companion.lightning .neon{animation:ringPulseFast .3s ease-in-out infinite alternate}
+#companion.curious .robot{filter:drop-shadow(0 0 8px rgba(90,210,255,.25))}
+#companion.love .heart-bubble{opacity:1}
+#companion.groove .sound-waves{opacity:1}
+#companion.sleeping .zzz-container{opacity:1}
+@keyframes excitedTilt{from{transform:rotate(-3deg) translateY(0)}to{transform:rotate(3deg) translateY(-3px)}}
+@keyframes curiousTilt{from{transform:rotate(-5deg)}to{transform:rotate(5deg) translateY(-2px)}}
+@keyframes loveTilt{from{transform:rotate(-2deg)}to{transform:rotate(2deg) translateY(-2px)}}
+@keyframes curiousLegTilt{from{transform:rotate(-2deg) translateY(0) scaleY(1)}to{transform:rotate(3deg) translateY(1.5px) scaleY(.97)}}
+@keyframes sleepyNod{0%,100%{transform:rotate(2deg) translateY(0)}50%{transform:rotate(4deg) translateY(2px)}}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
   }
-  body { display: grid; place-items: center; user-select: none; }
-  #companion {
-    width: 100%; height: 100%; display: grid; place-items: center;
-    background: transparent !important; border: 0 !important; outline: 0 !important;
-    box-shadow: none !important; cursor: grab; -webkit-tap-highlight-color: transparent;
-  }
-  #companion:active { cursor: grabbing; }
-  svg { width: 100%; height: 100%; overflow: visible; shape-rendering: crispEdges; }
-  .sprite { transform-origin: 90px 104px; animation: bob 2.8s steps(4,end) infinite; filter: drop-shadow(0 4px 3px rgba(15, 35, 48, .28)); }
-  .pixel-shadow { transform-origin: 90px 160px; animation: shadow 2.8s steps(4,end) infinite; }
-  .eye { animation: blink 5s steps(1,end) infinite; }
-  #companion.happy .sprite { animation: hop .48s steps(4,end) 2; }
-  #companion:hover .sprite { filter: drop-shadow(0 4px 3px rgba(15, 35, 48, .28)) brightness(1.08); }
-  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-  @keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-  @keyframes shadow { 0%,100% { transform: scaleX(1); opacity:.32; } 50% { transform:scaleX(.78); opacity:.2; } }
-  @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform:scaleY(.12); } }
-  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+}
 </style>
 </head>
+
 <body>
-<div id="companion" title="AI Companion — click to chat, right-click to quit" aria-label="AI Companion">
-<svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A tiny pixel-art robot companion">
+<div id="companion" class="idle" title="Click to cycle emotions, drag to move, right-click to quit">
+
+<svg class="robot" viewBox="0 0 430 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cute robot wearing blue headphones with glowing cyan eyes">
   <defs>
-    <filter id="spriteShadow" x="-60%" y="-60%" width="220%" height="240%">
-      <feGaussianBlur stdDeviation="3.2"/>
-    </filter>
+    <linearGradient id="band" gradientUnits="userSpaceOnUse" x1="40" y1="0" x2="390" y2="0">
+      <stop offset="0" stop-color="#4a6bff"/>
+      <stop offset=".3" stop-color="#2a3cb8"/>
+      <stop offset=".7" stop-color="#1a2580"/>
+      <stop offset="1" stop-color="#2f46d0"/>
+    </linearGradient>
+    <linearGradient id="cup" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6f8cff"/>
+      <stop offset=".45" stop-color="#2f4be0"/>
+      <stop offset="1" stop-color="#16217a"/>
+    </linearGradient>
+    <linearGradient id="cupR" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#6f8cff"/>
+      <stop offset=".45" stop-color="#2f4be0"/>
+      <stop offset="1" stop-color="#16217a"/>
+    </linearGradient>
     <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b9e9f4"/><stop offset="1" stop-color="#65a9c7"/>
+      <stop offset="0" stop-color="#2c3146"/>
+      <stop offset=".55" stop-color="#171a27"/>
+      <stop offset="1" stop-color="#0d0f18"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".5" stop-color="#d9dce6"/>
+      <stop offset="1" stop-color="#8d93a6"/>
+    </linearGradient>
+    <linearGradient id="ringInner" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7b8196"/>
+      <stop offset="1" stop-color="#e8eaf2"/>
+    </linearGradient>
+    <radialGradient id="screen" cx=".35" cy=".25" r=".95">
+      <stop offset="0" stop-color="#2a2a30"/>
+      <stop offset=".5" stop-color="#0e0e12"/>
+      <stop offset="1" stop-color="#030305"/>
+    </radialGradient>
+    <linearGradient id="eye" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7bf8ff"/>
+      <stop offset="1" stop-color="#05c4e2"/>
+    </linearGradient>
+    <linearGradient id="leg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3a3f55"/>
+      <stop offset=".35" stop-color="#1b1e2c"/>
+      <stop offset="1" stop-color="#0f111a"/>
+    </linearGradient>
+    <linearGradient id="foot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d3247"/>
+      <stop offset=".5" stop-color="#171a27"/>
+      <stop offset="1" stop-color="#0c0e16"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6fa0ff"/>
+      <stop offset=".5" stop-color="#2d4cff"/>
+      <stop offset="1" stop-color="#1a2dc8"/>
+    </linearGradient>
+    <linearGradient id="shadowLeg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blurGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="blurSm" x="-50%" y="-200%" width="200%" height="500%"><feGaussianBlur stdDeviation="3.5"/></filter>
+    <filter id="blurLine" x="-400%" y="-30%" width="900%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>
+    <linearGradient id="crescent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f66ff"/>
+      <stop offset=".5" stop-color="#7fd0ff"/>
+      <stop offset="1" stop-color="#2f66ff"/>
     </linearGradient>
   </defs>
-  <!-- The only shadow is attached to the character; the window and page stay transparent. -->
-  <ellipse class="pixel-shadow" cx="90" cy="158" rx="34" ry="5" fill="#142b3a" opacity=".3" filter="url(#spriteShadow)"/>
-  <g class="sprite">
-    <!-- antenna -->
-    <rect x="87" y="15" width="6" height="13" fill="#426b83"/>
-    <rect x="84" y="9" width="12" height="8" fill="#f6c96b"/>
-    <rect x="87" y="11" width="6" height="4" fill="#fff0b6"/>
-    <!-- ears / side fins -->
-    <rect x="37" y="62" width="12" height="24" fill="#477d99"/>
-    <rect x="131" y="62" width="12" height="24" fill="#477d99"/>
-    <rect x="41" y="68" width="5" height="12" fill="#a8e0e9"/>
-    <rect x="134" y="68" width="5" height="12" fill="#a8e0e9"/>
-    <!-- head shell -->
-    <rect x="52" y="31" width="76" height="8" fill="#426b83"/>
-    <rect x="44" y="39" width="92" height="68" fill="#426b83"/>
-    <rect x="49" y="35" width="82" height="68" fill="url(#shell)"/>
-    <rect x="57" y="29" width="66" height="8" fill="#d5f5f6"/>
-    <rect x="49" y="43" width="82" height="55" fill="url(#shell)"/>
-    <!-- face panel -->
-    <rect x="57" y="51" width="66" height="39" fill="#f2fbf5"/>
-    <rect x="62" y="55" width="56" height="31" fill="#fffdf1"/>
-    <!-- eyes -->
-    <g class="eye" fill="#25445a">
-      <rect x="72" y="64" width="8" height="10"/>
-      <rect x="100" y="64" width="8" height="10"/>
+<g class="robot-motion">
+
+<g class="legs-group">
+  <!-- legs -->
+  <rect x="118" y="310" width="68" height="85" rx="10" fill="url(#leg)"/>
+  <rect x="246" y="310" width="62" height="85" rx="10" fill="url(#leg)"/>
+  <rect x="118" y="312" width="68" height="40" fill="url(#shadowLeg)"/>
+  <rect x="246" y="312" width="62" height="40" fill="url(#shadowLeg)"/>
+
+  <!-- Slightly smaller shoes with independent random fidgets -->
+  <g transform="translate(10.8 32.9) scale(.92)">
+    <g class="shoe shoe-left">
+      <path d="M68 434 C66 398 92 372 134 372 L186 372 C200 376 207 404 207 434 Z" fill="url(#foot)"/>
+      <path d="M84 392 C96 380 112 376 134 376" fill="none" stroke="#5a6080" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+      <g class="neon">
+        <rect x="60" y="436" width="150" height="14" rx="7" fill="#2d4cff" opacity=".7" filter="url(#blurSm)"/>
+        <rect x="62" y="435" width="146" height="12" rx="6" fill="url(#neon)" stroke="#8fb4ff" stroke-width="1.5"/>
+        <rect x="76" y="437" width="118" height="3" rx="1.5" fill="#cfe0ff" opacity=".8"/>
+      </g>
     </g>
-    <rect x="74" y="64" width="3" height="3" fill="#fff"/>
-    <rect x="102" y="64" width="3" height="3" fill="#fff"/>
-    <!-- tiny smile -->
-    <rect x="85" y="78" width="10" height="3" fill="#d98d83"/>
-    <rect x="82" y="75" width="3" height="3" fill="#d98d83"/>
-    <rect x="95" y="75" width="3" height="3" fill="#d98d83"/>
-    <!-- body -->
-    <rect x="57" y="103" width="66" height="8" fill="#426b83"/>
-    <rect x="49" y="111" width="82" height="34" fill="#477d99"/>
-    <rect x="56" y="108" width="68" height="32" fill="#83c3d5"/>
-    <rect x="69" y="115" width="42" height="18" fill="#eaf8ed"/>
-    <rect x="84" y="120" width="12" height="8" fill="#f6c96b"/>
-    <!-- arms -->
-    <rect x="37" y="113" width="12" height="22" fill="#426b83"/>
-    <rect x="131" y="113" width="12" height="22" fill="#426b83"/>
-    <rect x="33" y="125" width="16" height="10" fill="#75b7cb"/>
-    <rect x="131" y="125" width="16" height="10" fill="#75b7cb"/>
-    <!-- feet -->
-    <rect x="61" y="140" width="22" height="9" fill="#355d76"/>
-    <rect x="97" y="140" width="22" height="9" fill="#355d76"/>
-    <rect x="65" y="149" width="14" height="4" fill="#f6c96b"/>
-    <rect x="101" y="149" width="14" height="4" fill="#f6c96b"/>
-    <!-- shell highlights -->
-    <rect x="53" y="45" width="4" height="40" fill="#d5f5f6" opacity=".8"/>
-    <rect x="123" y="45" width="4" height="40" fill="#4e8da9" opacity=".65"/>
   </g>
+  <g transform="translate(23.6 32.9) scale(.92)">
+    <g class="shoe shoe-right">
+      <path d="M226 434 C226 404 232 376 246 372 L300 372 C342 372 366 398 364 434 Z" fill="url(#foot)"/>
+      <path d="M250 380 C262 376 276 374 300 376" fill="none" stroke="#5a6080" stroke-width="3" stroke-linecap="round" opacity=".6"/>
+      <g class="neon">
+        <rect x="222" y="436" width="152" height="14" rx="7" fill="#2d4cff" opacity=".7" filter="url(#blurSm)"/>
+        <rect x="225" y="435" width="148" height="12" rx="6" fill="url(#neon)" stroke="#8fb4ff" stroke-width="1.5"/>
+        <rect x="240" y="437" width="120" height="3" rx="1.5" fill="#cfe0ff" opacity=".8"/>
+      </g>
+    </g>
+  </g>
+</g>
+  <!-- headband -->
+  <path d="M50 156 C44 20 386 20 380 156" fill="none" stroke="#0b1042" stroke-width="10" stroke-linecap="round"/>
+  <path d="M50 156 C44 20 386 20 380 156" fill="none" stroke="url(#band)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M50 156 C44 20 386 20 380 156" fill="none" stroke="#9db4ff" stroke-width="1.5" stroke-linecap="round" opacity=".45" transform="translate(0,-2)"/>
+
+  <!-- head shell -->
+  <rect x="76" y="92" width="278" height="234" rx="78" fill="url(#shell)"/>
+  <rect x="78" y="94" width="274" height="230" rx="76" fill="none" stroke="#4a5070" stroke-width="2" opacity=".6"/>
+
+  <!-- silver ring -->
+  <rect x="88" y="106" width="254" height="206" rx="64" fill="url(#ring)"/>
+  <rect x="96" y="114" width="238" height="190" rx="56" fill="url(#ringInner)"/>
+  <rect x="99" y="117" width="232" height="184" rx="53" fill="#1a1c28"/>
+
+  <!-- screen -->
+  <rect x="106" y="126" width="218" height="168" rx="50" fill="url(#screen)"/>
+  <path d="M122 160 C124 138 142 130 168 130 L240 130" fill="none" stroke="#6a6f85" stroke-width="3" stroke-linecap="round" opacity=".45"/>
+
+  <!-- Original idle face: soft cyan eyes, blink retained -->
+  <g class="art-face face-idle">
+    <g class="glow">
+      <rect x="132" y="184" width="68" height="68" rx="16" fill="#00e5ff" opacity=".55" filter="url(#blurGlow)"/>
+      <rect x="216" y="184" width="68" height="68" rx="16" fill="#00e5ff" opacity=".55" filter="url(#blurGlow)"/>
+    </g>
+    <rect class="eye" id="eyeL" x="138" y="190" width="56" height="56" rx="13" fill="url(#eye)"/>
+    <rect class="eye" id="eyeR" x="222" y="190" width="56" height="56" rx="13" fill="url(#eye)"/>
+  </g>
+  <!-- Happy: closed crescent eyes and a blush -->
+  <g class="art-face face-happy" fill="none" stroke="#42efff" stroke-width="10" stroke-linecap="round">
+    <path d="M139 220q27-31 54 0"/><path d="M223 220q27-31 54 0"/>
+    <path d="M118 242h15m150 0h15" stroke="#ff96bd" stroke-width="7" opacity=".8"/>
+  </g>
+  <!-- Excited: electric cyan bolts -->
+  <g class="art-face face-lightning" fill="#38efff" filter="url(#blurSm)">
+    <path d="M147 187h27l-12 23h18l-37 40 10-29h-16Z"/>
+    <path d="M231 187h27l-12 23h18l-37 40 10-29h-16Z"/>
+  </g>
+  <!-- Curious: uneven eyes and a small glint -->
+  <g class="art-face face-curious">
+    <rect x="140" y="193" width="48" height="48" rx="14" fill="url(#eye)" filter="url(#blurSm)"/>
+    <rect x="224" y="183" width="58" height="58" rx="16" fill="url(#eye)" filter="url(#blurSm)"/>
+    <circle cx="299" cy="169" r="5" fill="#77efff"/>
+  </g>
+  <!-- Groove: smiling eyes with sound waves -->
+  <g class="art-face face-groove">
+    <path d="M139 221q27-30 54 0m30 0q27-30 54 0" fill="none" stroke="#39eaff" stroke-width="9" stroke-linecap="round"/>
+    <g class="sound-waves" fill="none" stroke="#46eaff" stroke-width="5" stroke-linecap="round">
+      <path d="M298 199q13 19 0 38"/><path d="M307 190q20 28 0 56"/>
+    </g>
+  </g>
+  <!-- Love: heart eyes and a floating heart bubble -->
+  <g class="art-face face-love">
+    <path d="M166 204c-16-17-34 7 0 34 34-27 16-51 0-34Z" fill="#35eaff" filter="url(#blurSm)"/>
+    <path d="M250 204c-16-17-34 7 0 34 34-27 16-51 0-34Z" fill="#35eaff" filter="url(#blurSm)"/>
+    <g class="heart-bubble" opacity="0" transform="translate(325 65)">
+      <path d="M0 20q0-15 15-15h34q15 0 15 15v20q0 15-15 15H25L12 66l3-11Q0 52 0 40Z" fill="#121d2b" stroke="#42eaff" stroke-width="4"/>
+      <path d="M32 29c-8-10-19 2 0 17 19-15 8-27 0-17Z" fill="#42eaff"/>
+    </g>
+  </g>
+  <!-- Sleeping: closed slits and floating Z marks -->
+  <g class="art-face face-sleeping">
+    <path d="M139 220h54m30 0h54" stroke="#55eaff" stroke-width="8" stroke-linecap="round"/>
+    <g class="zzz-container" opacity="0" fill="#7cecff" font-family="Segoe UI,sans-serif" font-weight="700">
+      <text class="z-char1" x="321" y="91" font-size="27">Z</text>
+      <text class="z-char2" x="348" y="65" font-size="20">z</text>
+    </g>
+  </g>  <!-- earcups: flush against the head sides -->
+  <g>
+    <rect x="18" y="146" width="48" height="122" rx="24" fill="#3d5cff" opacity=".45" filter="url(#blurGlow)"/>
+    <rect x="25" y="140" width="55" height="134" rx="26" fill="#0b1042"/>
+    <rect x="28" y="143" width="49" height="128" rx="23" fill="url(#cup)"/>
+    <rect x="28.8" y="143.8" width="47.4" height="126.4" rx="22.5" fill="none" stroke="#b4c8ff" stroke-width="1.4" opacity=".55"/>
+    <rect x="45" y="155" width="33" height="104" rx="16" fill="#0f1654"/>
+    <rect x="47" y="158" width="29" height="98" rx="14" fill="#1a2370" stroke="#2f44c8" stroke-width="1.5"/>
+    <rect x="52" y="172" width="5" height="68" rx="2.5" fill="#4660ec" opacity=".75"/>
+    <rect x="35" y="160" width="7" height="94" rx="3.5" fill="#8fb0ff" opacity=".9" filter="url(#blurSm)"/>
+    <rect x="35" y="160" width="7" height="94" rx="3.5" fill="#dbe5ff" opacity=".95"/>
+    <path d="M34 166 C35 154 42 148 52 147" fill="none" stroke="#e4ebff" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+    <path d="M36 262 C40 268 48 270 58 269" fill="none" stroke="#5f7cf5" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+  </g>
+  <g>
+    <rect x="364" y="146" width="48" height="122" rx="24" fill="#3d5cff" opacity=".45" filter="url(#blurGlow)"/>
+    <rect x="350" y="140" width="55" height="134" rx="26" fill="#0b1042"/>
+    <rect x="353" y="143" width="49" height="128" rx="23" fill="url(#cupR)"/>
+    <rect x="353.8" y="143.8" width="47.4" height="126.4" rx="22.5" fill="none" stroke="#b4c8ff" stroke-width="1.4" opacity=".55"/>
+    <rect x="352" y="155" width="33" height="104" rx="16" fill="#0f1654"/>
+    <rect x="354" y="158" width="29" height="98" rx="14" fill="#1a2370" stroke="#2f44c8" stroke-width="1.5"/>
+    <rect x="373" y="172" width="5" height="68" rx="2.5" fill="#4660ec" opacity=".75"/>
+    <rect x="388" y="160" width="7" height="94" rx="3.5" fill="#8fb0ff" opacity=".9" filter="url(#blurSm)"/>
+    <rect x="388" y="160" width="7" height="94" rx="3.5" fill="#dbe5ff" opacity=".95"/>
+    <path d="M396 166 C395 154 388 148 378 147" fill="none" stroke="#e4ebff" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+    <path d="M394 262 C390 268 382 270 372 269" fill="none" stroke="#5f7cf5" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+  </g>
+  <!-- outer glowing crescent fill on the earcups -->
+  <g class="neon">
+    <path d="M25 164 C10 186 10 228 25 250 C21 232 21 182 25 164 Z" fill="#3d8bff" filter="url(#blurLine)" opacity=".9"/>
+    <path d="M25 164 C10 186 10 228 25 250 C21 232 21 182 25 164 Z" fill="url(#crescent)"/>
+    <path d="M23 172 C14 190 14 224 23 242" fill="none" stroke="#e8f4ff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+    <path d="M405 164 C420 186 420 228 405 250 C409 232 409 182 405 164 Z" fill="#3d8bff" filter="url(#blurLine)" opacity=".9"/>
+    <path d="M405 164 C420 186 420 228 405 250 C409 232 409 182 405 164 Z" fill="url(#crescent)"/>
+    <path d="M407 172 C416 190 416 224 407 242" fill="none" stroke="#e8f4ff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+  </g>
+</g>
 </svg>
+
 </div>
+<button id="callAction" type="button" aria-label="End voice call">End call</button>
+
 <script>
-const companion = document.getElementById('companion');
-let startX = 0, startY = 0, moved = false, pointerId = null;
-function sendToApp(message) { if (window.ipc?.postMessage) window.ipc.postMessage(message); }
-companion.addEventListener('pointerdown', (event) => {
+const companion = document.getElementById("companion");
+const eyeL = document.getElementById("eyeL");
+const eyeR = document.getElementById("eyeR");
+const shoes = Array.from(document.querySelectorAll(".shoe"));
+
+let startX = 0;
+let startY = 0;
+let pointerId = null;
+let moved = false;
+let suppressClick = false;
+let autoResetTimer = null;
+let idleFidgetTimer = null;
+let audioCtx = null;
+
+// The ordered emotional behavior cycle directly matching reference sprites
+const BEHAVIORS = [
+  "happy",     // ^_^ joyful hops
+  "lightning", // ⚡ excited electric bolts
+  "curious",   // tilted curious head
+  "groove",    // 🎵 dancing groove + soundwaves
+  "love",      // 💙 cyan heart bubble + blush
+  "sleeping",  // 💤 sleepy slits + floating Zzz
+  "idle"       // neutral breathing & blinking
+];
+let currentBehaviorIndex = -1;
+
+// ================= PROCEDURAL AUDIO SYNTHESIZER =================
+function playRobotChime(mood) {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (mood === 'happy') {
+      // Cheerful ascending arpeggio
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, t);
+      osc.frequency.exponentialRampToValueAtTime(659.25, t + 0.07);
+      osc.frequency.exponentialRampToValueAtTime(783.99, t + 0.14);
+      osc.frequency.exponentialRampToValueAtTime(1046.50, t + 0.22);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    } else if (mood === 'lightning') {
+      // Sci-fi electric zap chirp
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(440, t);
+      osc.frequency.linearRampToValueAtTime(920, t + 0.08);
+      osc.frequency.linearRampToValueAtTime(620, t + 0.15);
+      osc.frequency.linearRampToValueAtTime(1200, t + 0.24);
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    } else if (mood === 'curious') {
+      // Inquisitive two-tone rising chime
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(493.88, t);
+      osc.frequency.exponentialRampToValueAtTime(739.99, t + 0.18);
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    } else if (mood === 'groove') {
+      // Rhythmic music blip
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(329.63, t);
+      osc.frequency.exponentialRampToValueAtTime(493.88, t + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(392.00, t + 0.2);
+      gain.gain.setValueAtTime(0.11, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t);
+      osc.stop(t + 0.35);
+    } else if (mood === 'love') {
+      // Sweet high melodic tone
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(659.25, t);
+      osc.frequency.exponentialRampToValueAtTime(987.77, t + 0.14);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+      osc.start(t);
+      osc.stop(t + 0.38);
+    } else if (mood === 'sleeping') {
+      // Soft gentle descending lullaby
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, t);
+      osc.frequency.exponentialRampToValueAtTime(220, t + 0.38);
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.start(t);
+      osc.stop(t + 0.45);
+    } else {
+      // Gentle idle blip
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, t);
+      osc.frequency.exponentialRampToValueAtTime(783.99, t + 0.08);
+      gain.gain.setValueAtTime(0.06, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      osc.start(t);
+      osc.stop(t + 0.14);
+    }
+  } catch (err) {}
+}
+
+// IPC helper for Rust app
+function sendToApp(message) {
+  if (window.ipc?.postMessage) {
+    window.ipc.postMessage(message);
+  }
+}
+
+// ================= DRAG AND MOVE LOGIC =================
+companion.addEventListener("pointerdown", event => {
+  if (event.button === 1) { event.preventDefault(); sendToApp("toggle-call"); return; }
   if (event.button !== 0) return;
-  startX = event.screenX; startY = event.screenY; moved = false; pointerId = event.pointerId;
+
+  startX = event.screenX;
+  startY = event.screenY;
+  moved = false;
+  pointerId = event.pointerId;
+
   companion.setPointerCapture(event.pointerId);
 });
-companion.addEventListener('pointermove', (event) => {
+
+companion.addEventListener("pointermove", event => {
   if (pointerId !== event.pointerId || !(event.buttons & 1)) return;
-  const dx = event.screenX - startX, dy = event.screenY - startY;
-  if (Math.abs(dx) + Math.abs(dy) < 3) return;
-  moved = true; startX = event.screenX; startY = event.screenY;
+
+  const dx = event.screenX - startX;
+  const dy = event.screenY - startY;
+
+  if (Math.abs(dx) + Math.abs(dy) < 4) return;
+
+  moved = true;
+  startX = event.screenX;
+  startY = event.screenY;
+
   sendToApp(`drag:${dx},${dy}`);
 });
-companion.addEventListener('pointerup', () => { pointerId = null; });
-companion.addEventListener('click', () => {
-  if (moved) { moved = false; return; }
-  companion.classList.remove('happy'); void companion.offsetWidth; companion.classList.add('happy');
-  sendToApp('toggle-chat');
+
+function finishPointer() {
+  if (moved) {
+    suppressClick = true;
+    setTimeout(() => suppressClick = false, 280);
+  }
+  pointerId = null;
+}
+
+companion.addEventListener("pointerup", finishPointer);
+companion.addEventListener("pointercancel", finishPointer);
+
+// ================= AUTOMATIC BEHAVIOR CHANGE ON CLICK =================
+// Click robot body: Cycles through behaviors automatically & toggles chat
+companion.addEventListener("click", event => {
+  if (event.button !== 0) return;
+  if (suppressClick || moved) {
+    suppressClick = false;
+    moved = false;
+    return;
+  }
+
+  // Advance to next behavior in sequence
+  currentBehaviorIndex = (currentBehaviorIndex + 1) % BEHAVIORS.length;
+  const nextMood = BEHAVIORS[currentBehaviorIndex];
+
+  window.companionReact(nextMood);
+  sendToApp("toggle-chat");
 });
-companion.addEventListener('contextmenu', (event) => {
-  event.preventDefault(); event.stopPropagation(); sendToApp('quit');
+
+// Double click to toggle sleeping mode immediately
+companion.addEventListener("dblclick", () => {
+  if (companion.classList.contains("sleeping")) {
+    window.companionReact("idle");
+  } else {
+    window.companionReact("sleeping");
+  }
 });
-window.companionReact = (state) => {
-  companion.classList.toggle('happy', state === 'happy');
+
+const callAction = document.getElementById("callAction");
+window.__setCallActive = active => callAction.classList.toggle("visible", !!active);
+callAction.addEventListener("click", event => { event.stopPropagation(); sendToApp("toggle-call"); });
+
+// Right click context menu to quit
+companion.addEventListener("contextmenu", event => {
+  event.preventDefault();
+  event.stopPropagation();
+  sendToApp("quit");
+});
+
+// ================= MOUSE CURSOR EYE TRACKING =================
+window.addEventListener("pointermove", (e) => {
+  if (!companion.classList.contains("idle")) return;
+
+  const rect = companion.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+
+  const dx = (e.clientX - centerX) / (window.innerWidth / 2 || 1);
+  const dy = (e.clientY - centerY) / (window.innerHeight / 2 || 1);
+
+  const clampX = Math.max(-4, Math.min(4, dx * 4));
+  const clampY = Math.max(-3, Math.min(3, dy * 3));
+
+  if (eyeL && eyeR) {
+    eyeL.style.translate = `${clampX}px ${clampY}px`;
+    eyeR.style.translate = `${clampX}px ${clampY}px`;
+  }
+});
+
+// ================= SPONTANEOUS IDLE FIDGETS =================
+function resetIdleFidget() {
+  if (idleFidgetTimer) clearTimeout(idleFidgetTimer);
+  idleFidgetTimer = setTimeout(() => {
+    if (companion.classList.contains("idle")) {
+      const fidgets = ["curious", "groove", "happy"];
+      const randomFidget = fidgets[Math.floor(Math.random() * fidgets.length)];
+      window.companionReact(randomFidget);
+    } else {
+      resetIdleFidget();
+    }
+  }, 16000 + Math.random() * 8000);
+}
+
+function scheduleShoeFidget() {
+  const delay = 1800 + Math.random() * 4400;
+  setTimeout(() => {
+    if (!document.hidden && !companion.classList.contains("sleeping") && shoes.length) {
+      const shoe = shoes[Math.floor(Math.random() * shoes.length)];
+      shoe.classList.remove("fidget");
+      void shoe.getBoundingClientRect();
+      shoe.classList.add("fidget");
+      setTimeout(() => shoe.classList.remove("fidget"), 700);
+    }
+    scheduleShoeFidget();
+  }, delay);
+}
+// ================= GLOBAL DISPATCHER =================
+window.companionReact = (mood) => {
+  const allMoods = [
+    "idle",
+    "happy",
+    "lightning",
+    "curious",
+    "groove",
+    "love",
+    "sleeping"
+  ];
+
+  if (!allMoods.includes(mood)) mood = "idle";
+
+  companion.classList.remove(...allMoods);
+  companion.classList.add(mood);
+
+  if (eyeL && eyeR) {
+    eyeL.style.translate = "";
+    eyeR.style.translate = "";
+  }
+
+  playRobotChime(mood);
+
+  if (autoResetTimer) clearTimeout(autoResetTimer);
+
+  // Momentary expressions return to idle after 3.2s
+  if (mood !== "idle" && mood !== "sleeping") {
+    autoResetTimer = setTimeout(() => {
+      if (companion.classList.contains(mood)) {
+        window.companionReact("idle");
+      }
+    }, 3200);
+  }
+
+  resetIdleFidget();
 };
+
+// Keyboard testing shortcuts: 1-7
+window.addEventListener("keydown", (e) => {
+  if (e.key === "1") window.companionReact("idle");
+  if (e.key === "2") window.companionReact("happy");
+  if (e.key === "3") window.companionReact("lightning");
+  if (e.key === "4") window.companionReact("curious");
+  if (e.key === "5") window.companionReact("groove");
+  if (e.key === "6") window.companionReact("love");
+  if (e.key === "7") window.companionReact("sleeping");
+});
+
+// Initialize in idle
+window.companionReact("idle");
+scheduleShoeFidget();
 </script>
+
 </body>
 </html>

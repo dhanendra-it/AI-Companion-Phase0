@@ -43,7 +43,7 @@ impl Default for Config {
 Reply in the language the user writes in (English, Hindi or Hinglish). Keep answers short unless asked \
 for more. If text read from the user's screen is included it comes from OCR, so it may contain mistakes \
 and unrelated menu or button text; use what is relevant. When asked to write an email or message, \
-give only the ready-to-send text."
+give only the ready-to-send text. Never use emojis."
                 .into(),
             providers: vec![
                 gemini("gemini-3.5-flash-lite"),

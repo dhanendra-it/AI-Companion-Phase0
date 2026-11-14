@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 tao = "0.30"
-wry = { version = "0.45", features = ["transparent"] }
+wry = "0.57"
 # Plain blocking HTTP client, no async runtime. TLS via rustls; gzip is off so
 # streamed (SSE) replies are never buffered by a decompressor.
 ureq = { version = "2", default-features = false, features = ["tls"] }
