@@ -168,13 +168,19 @@ fn short(text: &str) -> String {
 }
 
 fn agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_secs(20))
-        .timeout_read(Duration::from_secs(60))
-        // Honour HTTPS_PROXY / ALL_PROXY if set (ureq ignores them otherwise).
-        .try_proxy_from_env(true)
-        .user_agent("aalu/0.1")
-        .build()
+    // One shared agent, so connections to the provider are kept alive and reused.
+    static AGENT: std::sync::OnceLock<ureq::Agent> = std::sync::OnceLock::new();
+    AGENT
+        .get_or_init(|| {
+            ureq::AgentBuilder::new()
+                .timeout_connect(Duration::from_secs(20))
+                .timeout_read(Duration::from_secs(60))
+                // Honour HTTPS_PROXY / ALL_PROXY if set (ureq ignores them otherwise).
+                .try_proxy_from_env(true)
+                .user_agent("aalu/0.1")
+                .build()
+        })
+        .clone()
 }
 
 fn attempt(
