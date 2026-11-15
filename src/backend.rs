@@ -100,6 +100,18 @@ impl Backend {
                     Err(error) => (self.emit)(Out::Js(chat::js_error(&format!("Could not save the key: {error}")))),
                 }
             }
+            ChatIpc::Voice { audio } => {
+                let cfg = self.cfg.clone();
+                let deps = self.deps;
+                let emit = self.emit.clone();
+                thread::spawn(move || {
+                    let key_for = |name: &str| (deps.key_get)(name);
+                    match ai::transcribe(&cfg, &audio, &key_for) {
+                        Ok(text) => emit(Out::Js(chat::js_transcript(&text))),
+                        Err(error) => emit(Out::Js(chat::js_error(&format!("Voice transcription failed: {error}")))),
+                    }
+                });
+            }
             ChatIpc::Translate { text } => self.start_translate(text),
             ChatIpc::Send { text, screen } => self.start_send(text, screen),
         }

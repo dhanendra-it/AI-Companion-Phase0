@@ -8,6 +8,7 @@ use serde_json::Value;
 const MAX_TEXT_CHARS: usize = 8_000;
 const MAX_SCREEN_CHARS: usize = 12_000;
 const MAX_HISTORY: usize = 8;
+const MAX_AUDIO_B64: usize = 4_000_000;
 
 #[derive(Debug, PartialEq)]
 pub enum ScreenMode {
@@ -44,6 +45,8 @@ pub enum ChatIpc {
     Translate { text: String },
     Send { text: String, screen: ScreenMode },
     SetKey { provider: String, key: String },
+    /// Base64 WAV recorded during a voice call, to be turned into text.
+    Voice { audio: String },
 }
 
 /// Parses a JSON message posted by the chat page. Unknown or malformed input is ignored.
@@ -71,6 +74,13 @@ pub fn parse_ipc(body: &str) -> Option<ChatIpc> {
                 _ => ScreenMode::Off,
             };
             Some(ChatIpc::Send { text, screen })
+        }
+        "voice" => {
+            let audio = value["audio"].as_str()?.trim();
+            if audio.is_empty() || audio.len() > MAX_AUDIO_B64 {
+                return None;
+            }
+            Some(ChatIpc::Voice { audio: audio.to_string() })
         }
         "key" => {
             let provider = value["provider"].as_str()?.to_string();
@@ -115,6 +125,10 @@ pub fn js_token(text: &str) -> String {
 
 pub fn js_notice(text: &str) -> String {
     format!("window.__ai.notice({})", js_str(text))
+}
+
+pub fn js_transcript(text: &str) -> String {
+    format!("window.__ai.transcript({})", js_str(text))
 }
 
 pub fn js_error(text: &str) -> String {
@@ -199,6 +213,9 @@ mod tests {
         assert_eq!(parse_ipc(r#"{"t":"ready"}"#), Some(ChatIpc::Ready));
         assert_eq!(parse_ipc(r#"{"t":"close"}"#), Some(ChatIpc::Close));
         assert_eq!(parse_ipc(r#"{"t":"new"}"#), Some(ChatIpc::NewChat));
+        assert_eq!(parse_ipc(r#"{"t":"voice","audio":"UklGRg=="}"#), Some(ChatIpc::Voice { audio: "UklGRg==".into() }));
+        assert_eq!(parse_ipc(r#"{"t":"voice","audio":""}"#), None);
+        assert_eq!(js_transcript("hi \"x\""), r#"window.__ai.transcript("hi \"x\"")"#);
     }
 
     #[test]

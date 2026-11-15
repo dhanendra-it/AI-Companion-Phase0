@@ -311,6 +311,60 @@ pub fn chat(
     Err(format!("{kind}No API key set for: {}. Click the gear icon and paste a key.", missing_keys.join(", ")))
 }
 
+/// Turns a base64 WAV recording into text with the first Gemini provider that
+/// has a key. Returns an empty string when there was no clear speech.
+pub fn transcribe(
+    cfg: &Config,
+    wav_b64: &str,
+    key_for: &dyn Fn(&str) -> Option<String>,
+) -> Result<String, String> {
+    let agent = agent();
+    let mut problems: Vec<String> = Vec::new();
+    for provider in cfg.providers.iter().filter(|p| p.name == "gemini") {
+        let Some(key) = key_for(&provider.name) else { continue };
+        let body = json!({
+            "model": provider.model,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "Transcribe this audio exactly as spoken. The speaker uses English, Hindi or Hinglish; write Hindi in Devanagari and English in Latin script. Return only the transcript. If there is no clear speech, return exactly NO_SPEECH." },
+                    { "type": "input_audio", "input_audio": { "data": wav_b64, "format": "wav" } }
+                ]
+            }]
+        })
+        .to_string();
+        let url = format!("{}/chat/completions", provider.base_url.trim_end_matches('/'));
+        let label = format!("{} ({})", provider.name, provider.model);
+        let result = agent
+            .post(&url)
+            .set("Authorization", &format!("Bearer {key}"))
+            .set("Content-Type", "application/json")
+            .send_string(&body);
+        match result {
+            Ok(response) => {
+                let mut text = String::new();
+                let _ = response.into_reader().take(200_000).read_to_string(&mut text);
+                let value: Value = serde_json::from_str(&text).unwrap_or_default();
+                let reply = value["choices"][0]["message"]["content"].as_str().unwrap_or("").trim();
+                return Ok(if reply == "NO_SPEECH" { String::new() } else { reply.to_string() });
+            }
+            Err(ureq::Error::Status(status, response)) => {
+                let mut text = String::new();
+                let _ = response.into_reader().take(2000).read_to_string(&mut text);
+                problems.push(format!("{label}: {}", describe(&AttemptError::Rejected { status, detail: short(&text) })));
+            }
+            Err(ureq::Error::Transport(transport)) => {
+                problems.push(format!("{label}: {}", describe(&AttemptError::Network(transport.to_string()))));
+            }
+        }
+    }
+    if problems.is_empty() {
+        Err("No Gemini API key set. Click the gear icon and paste a key.".into())
+    } else {
+        Err(problems.join("\n"))
+    }
+}
+
 /// Standard base64 (with padding), used to embed the screenshot JPEG.
 pub fn base64(data: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
