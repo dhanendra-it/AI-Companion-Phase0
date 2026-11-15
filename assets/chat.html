@@ -90,7 +90,7 @@ a{color:#75d9c7}
 <button class="closep" id="closeP">Done</button></div></div>
 <script>
 const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),translateBtn=$('translateBtn'),screen=$('screen'),panel=$('panel'),welcome=$('welcome'),callBtn=$('callBtn'),voiceWave=$('voiceWave');
-let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false;
+let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false,micReady=false;
 const post=o=>window.ipc.postMessage(JSON.stringify(o));
 document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',()=>post({t:'window',action:button.dataset.window})));
 $('closeWindow').addEventListener('click',()=>post({t:'close'}));
