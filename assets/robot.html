@@ -391,6 +391,7 @@ svg {
     transition: none !important;
   }
 }
+body.app-hidden #companion, body.app-hidden #companion * { animation-play-state: paused !important; }
 </style>
 </head>
 
@@ -729,6 +730,8 @@ function playRobotChime(mood) {
   } catch (err) {}
 }
 
+window.__setAppVisible = visible => document.body.classList.toggle("app-hidden", !visible);
+
 // IPC helper for Rust app
 function sendToApp(message) {
   if (window.ipc?.postMessage) {
@@ -831,7 +834,7 @@ callAction.addEventListener("click", event => { event.stopPropagation(); sendToA
 companion.addEventListener("contextmenu", event => {
   event.preventDefault();
   event.stopPropagation();
-  sendToApp("quit");
+  sendToApp("hide-robot");
 });
 
 // ================= MOUSE CURSOR EYE TRACKING =================

@@ -5,11 +5,11 @@ A Windows 11 desktop companion with a floating robot, AI chat, voice calls, scre
 ## Scope and status
 
 - **Included:** Tao native frameless transparent always-on-top robot window, click to open chat, Alt+Space chat, Right Ctrl+Space scheduler, and Right Ctrl+Up robot visibility hotkeys, Wry/WebView2 chat, AI providers, voice calling, screen context, reminders, custom robot window icon, Windows sign-in startup registration, and process-tree RAM measurement script.
-- **Windows startup:** when the app launches, it registers itself for the current Windows user so the robot starts at sign-in.
+- **Windows startup:** when the app launches, it registers itself for the current Windows user so the robot starts at sign-in. Right-clicking the robot hides all Aalu windows while keeping the process and global shortcuts active; Right Ctrl+Up shows the robot again. Robot CSS animations pause while hidden to reduce background work.
 - **Window icon:** the chat and scheduler windows use the custom Aalu robot icon.
-- **Close behavior:** closing the chat window drops its Tao window and Wry WebView object; clicking the robot creates a fresh chat window.
+- **Close behavior:** closing the chat window drops its Tao window and Wry WebView object; clicking the robot creates a fresh chat window. Starting a voice call from the robot keeps the chat hidden; if microphone access fails, chat appears to show the error. Speech prefers common installed masculine Windows voices when available; voice availability depends on Windows.
 - **Not implemented:** packaging/installer and persistent chat history. Robot dragging, hotkeys, and startup behavior still need Windows runtime verification.
-- **Verification:** `cargo check --release` passes with the updated shortcuts. The previous full build could not replace `target\release\aalu.exe` (Access denied); close Aalu before rebuilding. Shortcut behavior still needs a live Windows check.
+- **Verification:** `cargo check --release` passes with the updated shortcuts. The previous full build could not replace `target\release\aalu.exe` (Access denied); close Aalu before rebuilding. Robot stays hidden until its WebView2 is created; creation retries up to three times. Startup and shortcut behavior still need a live Windows check.
 - **Shortcuts:** Alt+Space toggles chat; Right Ctrl+Space toggles the scheduler; Right Ctrl+Up shows or hides the robot.
 
 ## Requirements
