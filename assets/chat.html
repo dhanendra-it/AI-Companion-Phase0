@@ -90,7 +90,7 @@ a{color:#75d9c7}
 <button class="closep" id="closeP">Done</button></div></div>
 <script>
 const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),translateBtn=$('translateBtn'),screen=$('screen'),panel=$('panel'),welcome=$('welcome'),callBtn=$('callBtn'),voiceWave=$('voiceWave');
-let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,voiceReplyPending=false,micStream=null,activeRec=null,listening=false,listenHinted=false,speakBuf='',ttsQueue=[],ttsBusy=false,replyDone=true;
+let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,voiceReplyPending=false,micStream=null,activeRec=null,listening=false,listenHinted=false,speakBuf='',ttsQueue=[],ttsBusy=false,replyDone=true,liveMode=false,live=null;
 const post=o=>window.ipc.postMessage(JSON.stringify(o));
 document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',()=>post({t:'window',action:button.dataset.window})));
 $('closeWindow').addEventListener('click',()=>post({t:'close'}));
@@ -108,6 +108,7 @@ function endPending(){if(pending){pending.remove();pending=null}}
 window.__ai={
   token(text){endPending();if(!cur){cur=add('bubble bot','');curText=''}curText+=text;cur.textContent=curText;down();if(voiceActive)feedSpeech(text)},
   notice(text){add('note',text)},
+  liveKey(info){if(voiceActive&&liveMode)startLive(info)},
   transcript(text){endPending();if(!voiceActive){voiceReplyPending=false;return}const t=(text||'').trim();if(!t){voiceReplyPending=false;setTimeout(startListening,200);return}input.value=t;send(true)},
   translationResult(result,source,grammarNote){
     endPending();
@@ -157,7 +158,7 @@ function translate(){
   setBusy(true);post({t:'translate',text});
 }
 function setVoiceState(active){voiceActive=active;document.body.classList.toggle('voice-active',active);callBtn.classList.toggle('active',active);callBtn.title=active?'End voice call (Esc)':'Start voice call';callBtn.setAttribute('aria-label',callBtn.title);callBtn.innerHTML=active?'<svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19a19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.5 2.8a2 2 0 0 1-.6 1.7L7.1 10a16 16 0 0 0 6 6l1.8-1.9a2 2 0 0 1 1.7-.6l2.8.5a2 2 0 0 1 1.6 1.9Z"/><path d="m3 3 18 18"/></svg>':'<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg>';if(!active)voiceWave.classList.remove('speaking');post({t:'voice-state',active})}
-function stopVoice(showNote=true){setVoiceState(false);voiceWave.classList.remove('speaking');voiceReplyPending=false;listenHinted=false;ttsQueue=[];ttsBusy=false;speakBuf='';if(activeRec){try{activeRec.stop()}catch(e){}activeRec=null}if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null}listening=false;if(window.speechSynthesis)speechSynthesis.cancel();if(showNote)add('note','Voice call ended')}
+function stopVoice(showNote=true){cleanupLive();liveMode=false;setVoiceState(false);voiceWave.classList.remove('speaking');voiceReplyPending=false;listenHinted=false;ttsQueue=[];ttsBusy=false;speakBuf='';if(activeRec){try{activeRec.stop()}catch(e){}activeRec=null}if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null}listening=false;if(window.speechSynthesis)speechSynthesis.cancel();if(showNote)add('note','Voice call ended')}
 async function toWavB64(blob){
   const ctx=new (window.AudioContext||window.webkitAudioContext)();
   const buf=await ctx.decodeAudioData(await blob.arrayBuffer());ctx.close();
@@ -214,9 +215,72 @@ function nextSpeech(){
   ttsBusy=true;const u=new SpeechSynthesisUtterance(t);u.lang=/[ऀ-ॿ]/.test(t)?'hi-IN':'en-IN';const voice=pickVoice(u.lang);if(voice)u.voice=voice;u.rate=1;u.pitch=1.03;
   voiceWave.classList.add('speaking');u.onend=nextSpeech;u.onerror=nextSpeech;speechSynthesis.speak(u);
 }
-function toggleVoice(){if(voiceActive){stopVoice();return}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){add('bubble err','Microphone recording is unavailable in this WebView2 runtime.');post({t:'voice-failed'});return}setVoiceState(true);add('note','Voice call started · speak after the listening indicator');setTimeout(startListening,250)}
+const LIVE_URL='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
+function micErrorText(error){return error.name==='NotAllowedError'?'Windows or WebView2 denied microphone access. Check Settings → Privacy & security → Microphone, then restart Aalu.':error.name==='NotFoundError'?'Windows did not find an available microphone.':'Microphone access failed: '+error.name}
+function b64FromInt16(i16){const b=new Uint8Array(i16.buffer,i16.byteOffset,i16.byteLength);let t='';for(let i=0;i<b.length;i+=0x8000)t+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(t)}
+function cleanupLive(){
+  const l=live;live=null;if(!l)return;
+  try{l.ws.onclose=null;l.ws.onmessage=null;l.ws.close()}catch(e){}
+  try{l.proc.onaudioprocess=null;l.proc.disconnect();l.src.disconnect()}catch(e){}
+  l.sources.forEach(x=>{try{x.stop()}catch(e){}});l.sources.clear();
+  try{l.capCtx.close()}catch(e){}try{l.playCtx.close()}catch(e){}
+  voiceWave.classList.remove('speaking');
+}
+function liveFallback(reason){
+  cleanupLive();if(!voiceActive)return;liveMode=false;
+  add('note','Live call unavailable ('+reason+'). Using the standard voice call.');
+  setTimeout(startListening,250);
+}
+function flushLive(l){l.sources.forEach(x=>{try{x.stop()}catch(e){}});l.sources.clear();l.next=0;voiceWave.classList.remove('speaking')}
+function playLive(l,b64,mime){
+  const rate=+((/rate=(\d+)/.exec(mime||'')||[])[1])||24000;
+  const bin=atob(b64),n=bin.length>>1,buf=l.playCtx.createBuffer(1,n,rate),ch=buf.getChannelData(0);
+  for(let i=0;i<n;i++){let v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);if(v&0x8000)v-=0x10000;ch[i]=v/32768}
+  const x=l.playCtx.createBufferSource();x.buffer=buf;x.connect(l.playCtx.destination);
+  const t=Math.max(l.playCtx.currentTime+0.02,l.next);x.start(t);l.next=t+buf.duration;
+  l.sources.add(x);voiceWave.classList.add('speaking');
+  x.onended=()=>{l.sources.delete(x);if(!l.sources.size)voiceWave.classList.remove('speaking')};
+}
+function handleLive(l,m){
+  if(m.setupComplete){l.ready=true;add('note','Live call connected · just speak, you can interrupt anytime');return}
+  const sc=m.serverContent;if(!sc)return;
+  if(sc.interrupted)flushLive(l);
+  if(sc.inputTranscription&&sc.inputTranscription.text){if(!l.userEl){box.querySelector('.welcome')?.remove();l.userEl=add('bubble user','');l.botEl=null}l.userEl.textContent+=sc.inputTranscription.text;down()}
+  const parts=(sc.modelTurn&&sc.modelTurn.parts)||[];
+  for(const p of parts)if(p.inlineData&&p.inlineData.data)playLive(l,p.inlineData.data,p.inlineData.mimeType);
+  if(sc.outputTranscription&&sc.outputTranscription.text){if(!l.botEl){box.querySelector('.welcome')?.remove();l.botEl=add('bubble bot','');l.userEl=null}l.botEl.textContent+=sc.outputTranscription.text;down()}
+  if(sc.turnComplete){l.botEl=null;l.userEl=null}
+}
+async function startLive(info){
+  let stream;
+  try{stream=await getMic()}catch(error){add('bubble err',micErrorText(error));stopVoice(false);return}
+  if(!voiceActive||!liveMode)return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  let capCtx,playCtx;
+  try{capCtx=new AC({sampleRate:16000});playCtx=new AC({sampleRate:24000})}catch(error){liveFallback('audio setup failed: '+error.name);return}
+  const resumeAll=()=>{capCtx.resume().catch(()=>{});playCtx.resume().catch(()=>{})};resumeAll();document.addEventListener('pointerdown',resumeAll,{once:true});
+  const src=capCtx.createMediaStreamSource(stream),proc=capCtx.createScriptProcessor(1024,1,1);
+  const ws=new WebSocket(LIVE_URL+'?key='+encodeURIComponent(info.key));
+  const l=live={ws,src,proc,capCtx,playCtx,sources:new Set(),next:0,ready:false,userEl:null,botEl:null};
+  proc.onaudioprocess=e=>{
+    if(!l.ready||ws.readyState!==1)return;
+    const f=e.inputBuffer.getChannelData(0),i16=new Int16Array(f.length);
+    for(let i=0;i<f.length;i++){const x=Math.max(-1,Math.min(1,f[i]));i16[i]=x<0?x*0x8000:x*0x7fff}
+    ws.send(JSON.stringify({realtimeInput:{audio:{data:b64FromInt16(i16),mimeType:'audio/pcm;rate=16000'}}}));
+  };
+  src.connect(proc);proc.connect(capCtx.destination);
+  ws.onopen=()=>ws.send(JSON.stringify({setup:{model:'models/'+info.model,responseModalities:['AUDIO'],systemInstruction:{parts:[{text:info.prompt}]},inputAudioTranscription:{},outputAudioTranscription:{}}}));
+  ws.onmessage=async ev=>{let m;try{m=JSON.parse(typeof ev.data==='string'?ev.data:await ev.data.text())}catch(e){return}if(live===l)handleLive(l,m)};
+  ws.onclose=ev=>{
+    if(live!==l)return;
+    const why=ev.code+(ev.reason?': '+ev.reason:'');
+    if(!l.ready){liveFallback('closed '+why);return}
+    cleanupLive();add('note','Live call ended · '+why);if(voiceActive)stopVoice(false);
+  };
+}
+function toggleVoice(){if(voiceActive){stopVoice();return}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){add('bubble err','Microphone recording is unavailable in this WebView2 runtime.');post({t:'voice-failed'});return}setVoiceState(true);liveMode=true;add('note','Connecting live call…');post({t:'live-key'})}
 window.__voice={toggle:toggleVoice,stop:()=>stopVoice(false)};
-window.addEventListener('beforeunload',()=>{if(activeRec)try{activeRec.stop()}catch(e){}if(micStream)micStream.getTracks().forEach(t=>t.stop());if(window.speechSynthesis)speechSynthesis.cancel()});
+window.addEventListener('beforeunload',()=>{cleanupLive();if(activeRec)try{activeRec.stop()}catch(e){}if(micStream)micStream.getTracks().forEach(t=>t.stop());if(window.speechSynthesis)speechSynthesis.cancel()});
 callBtn.addEventListener('click',toggleVoice);
 
 $('form').addEventListener('submit',e=>{e.preventDefault();send()});

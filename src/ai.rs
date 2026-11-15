@@ -28,6 +28,13 @@ pub struct Config {
     pub system_prompt: String,
     /// Tried in this order. When one fails (limit, bad key, outage) the next is used.
     pub providers: Vec<ProviderCfg>,
+    /// Gemini Live model used for real-time voice calls.
+    #[serde(default = "default_live_model")]
+    pub live_model: String,
+}
+
+pub fn default_live_model() -> String {
+    "gemini-3.8-live".into()
 }
 
 impl Default for Config {
@@ -49,6 +56,7 @@ give only the ready-to-send text. Never use emojis."
                 gemini("gemini-3.5-flash-lite"),
                 gemini("gemini-3.8-flash"),
             ],
+            live_model: default_live_model(),
         }
     }
 }
@@ -455,7 +463,7 @@ mod tests {
     }
 
     fn cfg(providers: Vec<ProviderCfg>) -> Config {
-        Config { system_prompt: "sys".into(), providers }
+        Config { system_prompt: "sys".into(), providers, live_model: default_live_model() }
     }
 
     fn keys(name: &str) -> Option<String> {

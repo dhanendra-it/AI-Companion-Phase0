@@ -100,6 +100,18 @@ impl Backend {
                     Err(error) => (self.emit)(Out::Js(chat::js_error(&format!("Could not save the key: {error}")))),
                 }
             }
+            ChatIpc::LiveKey => match (self.deps.key_get)("gemini") {
+                Some(key) => {
+                    let prompt = format!(
+                        "{} This is a live voice call: speak naturally and keep each reply to one or two short sentences.",
+                        self.cfg.system_prompt
+                    );
+                    (self.emit)(Out::Js(chat::js_live_key(&key, &self.cfg.live_model, &prompt)));
+                }
+                None => (self.emit)(Out::Js(chat::js_error(
+                    "No Gemini API key set. Click the gear icon and paste a key.",
+                ))),
+            },
             ChatIpc::Voice { audio } => {
                 let cfg = self.cfg.clone();
                 let deps = self.deps;
@@ -313,6 +325,7 @@ mod tests {
                 ai::ProviderCfg { name: "groq".into(), base_url: base.into(), model: "m".into(), vision },
                 ai::ProviderCfg { name: "gemini".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "g".into(), vision: true },
             ],
+            live_model: "live-m".into(),
         }
     }
 

@@ -47,6 +47,8 @@ pub enum ChatIpc {
     SetKey { provider: String, key: String },
     /// Base64 WAV recorded during a voice call, to be turned into text.
     Voice { audio: String },
+    /// The page wants the Gemini key and model to open a Live API call.
+    LiveKey,
 }
 
 /// Parses a JSON message posted by the chat page. Unknown or malformed input is ignored.
@@ -75,6 +77,7 @@ pub fn parse_ipc(body: &str) -> Option<ChatIpc> {
             };
             Some(ChatIpc::Send { text, screen })
         }
+        "live-key" => Some(ChatIpc::LiveKey),
         "voice" => {
             let audio = value["audio"].as_str()?.trim();
             if audio.is_empty() || audio.len() > MAX_AUDIO_B64 {
@@ -125,6 +128,15 @@ pub fn js_token(text: &str) -> String {
 
 pub fn js_notice(text: &str) -> String {
     format!("window.__ai.notice({})", js_str(text))
+}
+
+pub fn js_live_key(key: &str, model: &str, prompt: &str) -> String {
+    format!(
+        "window.__ai.liveKey({{key:{},model:{},prompt:{}}})",
+        js_str(key),
+        js_str(model),
+        js_str(prompt)
+    )
 }
 
 pub fn js_transcript(text: &str) -> String {
@@ -215,6 +227,11 @@ mod tests {
         assert_eq!(parse_ipc(r#"{"t":"new"}"#), Some(ChatIpc::NewChat));
         assert_eq!(parse_ipc(r#"{"t":"voice","audio":"UklGRg=="}"#), Some(ChatIpc::Voice { audio: "UklGRg==".into() }));
         assert_eq!(parse_ipc(r#"{"t":"voice","audio":""}"#), None);
+        assert_eq!(parse_ipc(r#"{"t":"live-key"}"#), Some(ChatIpc::LiveKey));
+        assert_eq!(
+            js_live_key("k\"1", "m", "p"),
+            r#"window.__ai.liveKey({key:"k\"1",model:"m",prompt:"p"})"#
+        );
         assert_eq!(js_transcript("hi \"x\""), r#"window.__ai.transcript("hi \"x\"")"#);
     }
 
