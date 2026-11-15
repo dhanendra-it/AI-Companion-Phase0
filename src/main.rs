@@ -275,7 +275,6 @@ fn main() -> wry::Result<()> {
     let root_id = robot_window.id();
     let mut chat_ready = false;
     let mut pending_voice_toggle = false;
-    let mut hide_chat_for_robot_call = false;
     let mut voice_active = false;
 
     let schedule = scheduler::load_schedule();
@@ -294,9 +293,16 @@ fn main() -> wry::Result<()> {
 
         match event {
             Event::UserEvent(AppEvent::ToggleRobotHotkey) => {
-                let visible = robot_window.is_visible();
-                robot_window.set_visible(!visible);
-                let _ = robot_webview.evaluate_script(&format!("window.__setAppVisible({})", !visible));
+                let show = !robot_window.is_visible();
+                robot_window.set_visible(show);
+                let _ = robot_webview.evaluate_script(&format!("window.__setAppVisible({show})"));
+                if !show {
+                    if let Some(view) = chat_webview.as_ref() {
+                        let _ = view.evaluate_script("window.__voice && window.__voice.stop()");
+                    }
+                    if let Some(window) = chat_window.as_ref() { window.set_visible(false); }
+                    if let Some(window) = scheduler_window.as_ref() { window.set_visible(false); }
+                }
             }
 
             Event::UserEvent(AppEvent::ToggleSchedulerHotkey) => {
@@ -353,7 +359,6 @@ fn main() -> wry::Result<()> {
                         }
                         return;
                     }
-                    hide_chat_for_robot_call = true;
                     open_chat(
                         target,
                         &robot_window,
@@ -362,7 +367,6 @@ fn main() -> wry::Result<()> {
                         &mut chat_webview,
                         is_reminder_active,
                     );
-                    if let Some(window) = chat_window.as_ref() { window.set_visible(false); }
                     if chat_ready {
                         if let Some(view) = chat_webview.as_ref() {
                             let _ = view.evaluate_script("window.__voice && window.__voice.toggle()");
@@ -384,16 +388,6 @@ fn main() -> wry::Result<()> {
                         is_reminder_active = false;
                         shrink_robot_window(&robot_window);
                     }
-                } else if message == "hide-robot" {
-                    if voice_active {
-                        if let Some(view) = chat_webview.as_ref() {
-                            let _ = view.evaluate_script("window.__voice && window.__voice.toggle()");
-                        }
-                    }
-                    robot_window.set_visible(false);
-                    let _ = robot_webview.evaluate_script("window.__setAppVisible(false)");
-                    if let Some(window) = chat_window.as_ref() { window.set_visible(false); }
-                    if let Some(window) = scheduler_window.as_ref() { window.set_visible(false); }
                 } else if message == "quit" {
                     unregister_global_hotkeys();
                     *control_flow = ControlFlow::Exit;
@@ -418,14 +412,8 @@ fn main() -> wry::Result<()> {
                 if ipc["t"] == "voice-state" {
                     let active = ipc["active"].as_bool().unwrap_or(false);
                     voice_active = active;
-                    if !active { hide_chat_for_robot_call = false; }
                     let _ = robot_webview.evaluate_script(&format!("window.__setCallActive({active})"));
-                } else if ipc["t"] == "voice-ready" {
-                    if hide_chat_for_robot_call {
-                        if let Some(window) = chat_window.as_ref() { window.set_visible(false); }
-                    }
                 } else if ipc["t"] == "voice-failed" {
-                    hide_chat_for_robot_call = false;
                     if let Some(window) = chat_window.as_ref() { window.set_visible(true); window.set_focus(); }
                 } else {
                     if ipc["t"] == "ready" {

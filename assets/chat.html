@@ -90,7 +90,7 @@ a{color:#75d9c7}
 <button class="closep" id="closeP">Done</button></div></div>
 <script>
 const $=id=>document.getElementById(id),box=$('messages'),input=$('input'),sendBtn=$('send'),translateBtn=$('translateBtn'),screen=$('screen'),panel=$('panel'),welcome=$('welcome'),callBtn=$('callBtn'),voiceWave=$('voiceWave');
-let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false,micReady=false;
+let busy=false,cur=null,curText='',pending=null,firstState=true,voiceActive=false,recognition=null,voiceReplyPending=false;
 const post=o=>window.ipc.postMessage(JSON.stringify(o));
 document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',()=>post({t:'window',action:button.dataset.window})));
 $('closeWindow').addEventListener('click',()=>post({t:'close'}));
@@ -159,20 +159,19 @@ function stopVoice(showNote=true){setVoiceState(false);voiceWave.classList.remov
 function startListening(){
   if(!voiceActive||voiceReplyPending||busy)return;
   if(!micReady){
-    if(!navigator.mediaDevices?.getUserMedia){add('bubble err','This WebView2 page cannot access the microphone.');post({t:'voice-failed'});stopVoice(false);return}
+    if(!navigator.mediaDevices?.getUserMedia){add('bubble err','This WebView2 page cannot access the microphone.');stopVoice(false);return}
     navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
       stream.getTracks().forEach(track=>track.stop());
       micReady=true;
-      post({t:'voice-ready'});
       startListening();
     }).catch(error=>{
       const detail=error.name==='NotAllowedError'?'Windows or WebView2 denied microphone access. Check Settings → Privacy & security → Microphone, then restart Aalu.':error.name==='NotFoundError'?'Windows did not find an available microphone.':'Microphone access failed: '+error.name;
-      add('bubble err',detail);post({t:'voice-failed'});stopVoice(false);
+      add('bubble err',detail);stopVoice(false);
     });
     return;
   }
   const API=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!API){add('bubble err','The microphone is available, but speech recognition is unavailable in this WebView2 runtime.');post({t:'voice-failed'});stopVoice(false);return}
+  if(!API){add('bubble err','The microphone is available, but speech recognition is unavailable in this WebView2 runtime.');stopVoice(false);return}
   voiceWave.classList.remove('speaking');const rec=new API();recognition=rec;rec.lang='en-IN';rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
   rec.onstart=()=>add('note','Listening · speak now');
   rec.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)text+=e.results[i][0].transcript;if(text.trim()&&voiceActive){voiceReplyPending=true;input.value=text.trim();rec.stop();send(true)}};
@@ -180,10 +179,10 @@ function startListening(){
   rec.onend=()=>{if(recognition===rec)recognition=null;if(voiceActive&&!voiceReplyPending&&!busy)setTimeout(startListening,350)};
   try{rec.start()}catch(e){recognition=null;if(voiceActive)setTimeout(startListening,500)}
 }
-function pickVoice(lang){const voices=speechSynthesis.getVoices();const prefix=lang.toLowerCase().startsWith('hi')?'hi':'en-in';const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(prefix));const male=matches.find(v=>/madhur|hemant|ravi|prabhat|david|mark|guy|male/i.test(v.name));return male||matches[0]||voices.find(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()))||null}
-function speakReply(text){if(!voiceActive)return;if(!window.SpeechSynthesisUtterance||!window.speechSynthesis){add('bubble err','Speech playback is unavailable on this system.');stopVoice(false);return}const u=new SpeechSynthesisUtterance(text);u.lang=/[\u0900-\u097F]/.test(text)?'hi-IN':'en-IN';const voice=pickVoice(u.lang);if(voice)u.voice=voice;u.rate=1.08;u.pitch=.98;voiceWave.classList.add('speaking');u.onend=()=>{voiceWave.classList.remove('speaking');voiceReplyPending=false;if(voiceActive)setTimeout(startListening,300)};u.onerror=()=>{voiceWave.classList.remove('speaking');voiceReplyPending=false;if(voiceActive)setTimeout(startListening,500)};speechSynthesis.cancel();speechSynthesis.speak(u)}
+function pickVoice(lang){const voices=speechSynthesis.getVoices();const prefix=lang.toLowerCase().startsWith('hi')?'hi':'en-in';const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(prefix));const preferred=matches.find(v=>/natural|neural|aria|jenny|priya|neerja|heera/i.test(v.name));return preferred||matches[0]||voices.find(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()))||null}
+function speakReply(text){if(!voiceActive)return;if(!window.SpeechSynthesisUtterance||!window.speechSynthesis){add('bubble err','Speech playback is unavailable on this system.');stopVoice(false);return}const u=new SpeechSynthesisUtterance(text);u.lang=/[\u0900-\u097F]/.test(text)?'hi-IN':'en-IN';const voice=pickVoice(u.lang);if(voice)u.voice=voice;u.rate=.94;u.pitch=1.03;voiceWave.classList.add('speaking');u.onend=()=>{voiceWave.classList.remove('speaking');voiceReplyPending=false;if(voiceActive)setTimeout(startListening,300)};u.onerror=()=>{voiceWave.classList.remove('speaking');voiceReplyPending=false;if(voiceActive)setTimeout(startListening,500)};speechSynthesis.cancel();speechSynthesis.speak(u)}
 function toggleVoice(){if(voiceActive){stopVoice();return}const API=window.SpeechRecognition||window.webkitSpeechRecognition;if(!API){add('bubble err','Speech recognition is unavailable in this WebView2 runtime.');post({t:'voice-failed'});return}setVoiceState(true);add('note','Voice call started · speak after the listening indicator');setTimeout(startListening,250)}
-window.__voice={toggle:toggleVoice};
+window.__voice={toggle:toggleVoice,stop:()=>stopVoice(false)};
 window.addEventListener('beforeunload',()=>{if(recognition)try{recognition.abort()}catch(e){}if(window.speechSynthesis)speechSynthesis.cancel()});
 callBtn.addEventListener('click',toggleVoice);
 

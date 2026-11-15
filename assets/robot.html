@@ -730,7 +730,17 @@ function playRobotChime(mood) {
   } catch (err) {}
 }
 
-window.__setAppVisible = visible => document.body.classList.toggle("app-hidden", !visible);
+window.__setAppVisible = visible => {
+  document.body.classList.toggle("app-hidden", !visible);
+  if (!visible) {
+    stopReminderAlarm();
+    if (reminderTimer) { clearTimeout(reminderTimer); reminderTimer = null; }
+    reminderStrip.classList.remove("visible");
+    if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
+  } else if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
+};
 
 // IPC helper for Rust app
 function sendToApp(message) {
@@ -834,7 +844,7 @@ callAction.addEventListener("click", event => { event.stopPropagation(); sendToA
 companion.addEventListener("contextmenu", event => {
   event.preventDefault();
   event.stopPropagation();
-  sendToApp("hide-robot");
+  sendToApp("quit");
 });
 
 // ================= MOUSE CURSOR EYE TRACKING =================
