@@ -4,6 +4,7 @@
 mod ai;
 mod app_icon;
 mod backend;
+mod bridge;
 mod chat;
 mod keys;
 mod scheduler;
@@ -60,6 +61,7 @@ enum AppEvent {
     BackendOut(backend::Out),
     Reminder(Vec<String>),
     SchedulerMessage(String),
+    Bridge(bridge::Event),
 }
 
 #[repr(C)]
@@ -218,6 +220,12 @@ fn main() -> wry::Result<()> {
     ));
 
     enable_startup();
+
+    // DeskBridge: keyboard + mouse to the Android tablet (Right Ctrl + Right Shift).
+    let bridge_proxy = proxy.clone();
+    bridge::start(move |event| {
+        let _ = bridge_proxy.send_event(AppEvent::Bridge(event));
+    });
 
     // Robot window: right-center position.
     let robot_position =
@@ -520,6 +528,22 @@ fn main() -> wry::Result<()> {
                         }
                     }
                     _ => {}
+                }
+            }
+
+            Event::UserEvent(AppEvent::Bridge(event)) => {
+                let js = match event {
+                    bridge::Event::Mode(on) => format!("window.__setTabletMode && window.__setTabletMode({on})"),
+                    bridge::Event::Refused(why) => {
+                        let text = serde_json::to_string(&why).unwrap_or_else(|_| "\"\"".into());
+                        format!("window.__tabletNotice && window.__tabletNotice({text})")
+                    }
+                    // Connection changes are only worth a message when they are the reason the
+                    // shortcut would not work; the robot shows that when the shortcut is pressed.
+                    bridge::Event::Link { .. } => String::new(),
+                };
+                if !js.is_empty() {
+                    let _ = robot_webview.evaluate_script(&js);
                 }
             }
 
