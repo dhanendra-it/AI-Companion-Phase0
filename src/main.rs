@@ -41,6 +41,7 @@ const ROBOT_HTML: &str = include_str!("../assets/robot.html");
 const CHAT_HTML: &str = include_str!("../assets/chat.html");
 const SCHEDULER_HTML: &str = include_str!("../assets/scheduler.html");
 const TABLET_STATUS_HTML: &str = include_str!("../assets/tablet-status.html");
+const PERSONAL_TOOLBAR_HTML: &str = include_str!("../assets/personal-toolbar.html");
 
 const ROBOT_WIDTH: f64 = 155.0;
 const ROBOT_HEIGHT: f64 = 195.0;
@@ -52,6 +53,8 @@ const SCHEDULER_WIDTH: f64 = 580.0;
 const SCHEDULER_HEIGHT: f64 = 480.0;
 const TABLET_STATUS_WIDTH: f64 = 310.0;
 const TABLET_STATUS_HEIGHT: f64 = 176.0;
+const TOOLBAR_WIDTH: f64 = 760.0;
+const TOOLBAR_HEIGHT: f64 = 610.0;
 const REMINDER_EXPAND_W: f64 = 145.0;
 const REMINDER_EXPAND_H: f64 = 70.0;
 
@@ -59,6 +62,8 @@ enum AppEvent {
     ToggleSchedulerHotkey,
     ToggleChatHotkey,
     ToggleRobotHotkey,
+    ToggleToolbar,
+    ToolbarMessage(String),
     RobotMessage(String),
     ChatMessage(String),
     BackendOut(backend::Out),
@@ -95,6 +100,7 @@ const MOD_NOREPEAT: u32 = 0x4000;
 const VK_SPACE: u32 = 0x20;
 const VK_UP: u32 = 0x26;
 const VK_RCONTROL: i32 = 0xA3;
+const VK_XBUTTON1: i32 = 0x05;
 
 #[link(name = "user32")]
 extern "system" {
@@ -204,6 +210,18 @@ fn main() -> wry::Result<()> {
 
     let (chat_hotkey_available, _scheduler_hotkey_available, _robot_hotkey_available) = register_global_hotkeys();
 
+    // Mouse Button 4 (XBUTTON1) toggles the Personal Toolbar.
+    let toolbar_mouse_proxy = proxy.clone();
+    let _toolbar_mouse_thread = std::thread::spawn(move || {
+        let mut was_down = false;
+        loop {
+            let down = unsafe { GetAsyncKeyState(VK_XBUTTON1) as u16 & 0x8000 != 0 };
+            if down && !was_down { let _ = toolbar_mouse_proxy.send_event(AppEvent::ToggleToolbar); }
+            was_down = down;
+            std::thread::sleep(std::time::Duration::from_millis(35));
+        }
+    });
+
     let emit_proxy = proxy.clone();
 
     let emit: backend::Emit = Arc::new(move |out| {
@@ -306,11 +324,30 @@ fn main() -> wry::Result<()> {
     let mut tablet_status_generation = 0u64;
     let mut scheduler_window: Option<Window> = None;
     let mut scheduler_webview: Option<WebView> = None;
+    let mut toolbar_window: Option<Window> = None;
+    let mut toolbar_webview: Option<WebView> = None;
 
     event_loop.run(move |event, target, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
+            Event::UserEvent(AppEvent::ToggleToolbar) => {
+                toggle_toolbar(target, &mut toolbar_window, &mut toolbar_webview, &proxy);
+            }
+
+            Event::UserEvent(AppEvent::ToolbarMessage(raw)) => {
+                if raw == "close" {
+                    if let Some(window) = toolbar_window.as_ref() { window.set_visible(false); }
+                } else if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
+                    match msg.get("t").and_then(|v| v.as_str()) {
+                        Some("open-url") if target.starts_with("https://") || target.starts_with("http://") => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
+                        Some("launch-app") if !target.trim().is_empty() => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
+                        _ => {}
+                    }
+                }
+            }
+
             Event::UserEvent(AppEvent::ToggleRobotHotkey) => {
                 let show = !robot_window.is_visible();
                 robot_window.set_visible(show);
@@ -670,6 +707,8 @@ fn main() -> wry::Result<()> {
                 } else if scheduler_window.as_ref().map(Window::id) == Some(window_id) {
                     scheduler_webview = None;
                     scheduler_window = None;
+                } else if toolbar_window.as_ref().map(Window::id) == Some(window_id) {
+                    if let Some(window) = toolbar_window.as_ref() { window.set_visible(false); }
                 } else if tablet_status_window.as_ref().map(Window::id) == Some(window_id) {
                     if let Some(window) = tablet_status_window.as_ref() { window.set_visible(false); }
                 }
@@ -1074,5 +1113,43 @@ fn enable_startup() {
         Ok(status) if !status.success() => eprintln!("Could not enable Aalu at Windows sign-in."),
         Err(error) => eprintln!("Could not enable Aalu at Windows sign-in: {error}"),
         _ => {}
+    }
+}
+
+
+fn toggle_toolbar(
+    target: &EventLoopWindowTarget<AppEvent>,
+    window_slot: &mut Option<Window>,
+    webview_slot: &mut Option<WebView>,
+    proxy: &EventLoopProxy<AppEvent>,
+) {
+    if let Some(window) = window_slot.as_ref() {
+        let visible = window.is_visible();
+        window.set_visible(!visible);
+        if !visible { window.set_focus(); }
+        return;
+    }
+    let window = match WindowBuilder::new()
+        .with_title("Aalu Personal Toolbar")
+        .with_window_icon(app_icon::window_icon())
+        .with_inner_size(LogicalSize::new(TOOLBAR_WIDTH, TOOLBAR_HEIGHT))
+        .with_min_inner_size(LogicalSize::new(520.0, 420.0))
+        .with_always_on_top(true)
+        .with_decorations(false)
+        .with_resizable(true)
+        .with_content_protection(true)
+        .build(target)
+    {
+        Ok(window) => window,
+        Err(error) => { eprintln!("Could not create Personal Toolbar window: {error}"); return; }
+    };
+    let toolbar_proxy = proxy.clone();
+    match WebViewBuilder::new()
+        .with_html(PERSONAL_TOOLBAR_HTML)
+        .with_ipc_handler(move |request| { let _ = toolbar_proxy.send_event(AppEvent::ToolbarMessage(request.body().clone())); })
+        .build(&window)
+    {
+        Ok(view) => { *window_slot = Some(window); *webview_slot = Some(view); }
+        Err(error) => eprintln!("Could not create Personal Toolbar WebView: {error}"),
     }
 }
