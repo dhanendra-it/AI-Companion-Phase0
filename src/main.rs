@@ -14,7 +14,7 @@ use std::{
     borrow::Cow,
     process::Command,
     ffi::c_void,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering as AtomicOrdering}},
 };
 
 use std::os::windows::process::CommandExt;
@@ -101,6 +101,10 @@ const VK_SPACE: u32 = 0x20;
 const VK_UP: u32 = 0x26;
 const VK_RCONTROL: i32 = 0xA3;
 const VK_XBUTTON2: i32 = 0x06;
+
+// User setting: hide Aalu windows during screen capture (default: true).
+// Toggled from the Personal Toolbar → Settings section.
+static HIDE_ON_CAPTURE: AtomicBool = AtomicBool::new(true);
 
 #[link(name = "user32")]
 extern "system" {
@@ -237,6 +241,7 @@ fn main() -> wry::Result<()> {
             key_set: keys::set,
             screen_text,
             screen_jpeg,
+            hide_on_capture: || HIDE_ON_CAPTURE.load(AtomicOrdering::Relaxed),
         },
         emit,
         if chat_hotkey_available { "Alt+Space".to_string() } else { String::new() },
@@ -346,10 +351,18 @@ fn main() -> wry::Result<()> {
                         _ => AppEvent::ToggleSchedulerHotkey,
                     });
                 } else if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    if let Some(hide) = msg.get("hide_on_capture").and_then(|v| v.as_bool()) {
+                        HIDE_ON_CAPTURE.store(hide, AtomicOrdering::Relaxed);
+                    }
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
                         Some("open-url") if target.starts_with("https://") || target.starts_with("http://") => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
                         Some("launch-app") if !target.trim().is_empty() => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
+                        Some("set-setting") => {
+                            if let Some(val) = msg.get("hide_on_capture").and_then(|v| v.as_bool()) {
+                                HIDE_ON_CAPTURE.store(val, AtomicOrdering::Relaxed);
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -1133,7 +1146,10 @@ fn toggle_toolbar(
     if let Some(window) = window_slot.as_ref() {
         let visible = window.is_visible();
         if !visible {
-            if let Some(view) = webview_slot.as_ref() { let _ = view.evaluate_script("window.__reset&&window.__reset()"); }
+            if let Some(view) = webview_slot.as_ref() {
+                let hide = HIDE_ON_CAPTURE.load(AtomicOrdering::Relaxed);
+                let _ = view.evaluate_script(&format!("window.__setSettings && window.__setSettings({{hideOnCapture: {hide}}}); window.__reset && window.__reset();"));
+            }
             center_toolbar(target, window);
         }
         window.set_visible(!visible);

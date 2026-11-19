@@ -17,6 +17,10 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 .ico .chev{position:absolute;right:-4px;bottom:2px;font-size:12px;color:#b9bcc7}
 .badge{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:19px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px rgba(0,0,0,.35)}
 .lbl{margin-top:6px;font-size:11.5px;font-weight:600;color:#e7e8ee;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sublbl{font-size:10px;color:#5eead4;font-weight:700;margin-top:2px;white-space:nowrap}
+.sublbl.off{color:#f87171}
+.toggle-on{background:linear-gradient(135deg,#0e9f6e,#057a55)!important;color:#fff!important;box-shadow:0 0 14px rgba(14,159,110,0.55)!important}
+.toggle-off{background:linear-gradient(135deg,#ef4444,#b91c1c)!important;color:#fff!important;box-shadow:0 0 14px rgba(239,68,68,0.4)!important}
 .add .ico{border:1.5px dashed rgba(255,255,255,.28);font-size:24px;color:#c4c7d2}
 .modal{display:none;position:absolute;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:24px;z-index:5}.modal.open{display:flex}
 .dialog{width:100%;background:#1d1f27;border:1px solid #43485a;border-radius:20px;padding:18px;display:grid;gap:10px}.dialog h2{margin:0 0 2px;font-size:15px}
@@ -38,15 +42,27 @@ const SVG={
  Shortcuts:'<path d="M15 4l3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/><path d="M26 4v5M23.5 6.5h5"/>',
  Folders:'<path d="M4 10a2 2 0 0 1 2-2h6l3 3h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
  "Window Manager":'<rect x="5" y="5" width="9" height="9" rx="2"/><rect x="18" y="5" width="9" height="9" rx="2"/><rect x="5" y="18" width="9" height="9" rx="2"/><rect x="18" y="18" width="9" height="9" rx="2"/>',
- Bookmarks:'<circle cx="16" cy="16" r="11"/><ellipse cx="16" cy="16" rx="5" ry="11"/><path d="M5 16h22M7 10h18M7 22h18"/>'
+ Bookmarks:'<circle cx="16" cy="16" r="11"/><ellipse cx="16" cy="16" rx="5" ry="11"/><path d="M5 16h22M7 10h18M7 22h18"/>',
+ Settings:'<circle cx="16" cy="16" r="4"/><path d="M16 3v4M16 25v4M3 16h4M25 16h4M6.8 6.8l2.8 2.8M22.4 22.4l2.8 2.8M6.8 25.2l2.8-2.8M22.4 9.6l2.8-2.8"/>'
 };
 // Ring order: [section key, label]. "Apps" slots (4-7) are filled from the user's pinned apps.
 const TOP=[["Commands","Text Snippets"],["Shortcuts","Shortcuts"],["Folders","Folders"],["Window Manager","Window Manager"]];
 const BOOKMARKS=["Bookmarks","Bookmarks"];
-const WM=[["▱","Show / hide Aalu","toggle-robot"],["◫","Open chat","open-chat"],["◷","Open scheduler","open-scheduler"]];
+const WM=[
+  ["▱","Show / hide Aalu","toggle-robot"],
+  ["◫","Open chat","open-chat"],
+  ["◷","Open scheduler","open-scheduler"],
+  ["⚙","Settings","settings"]
+];
 const key="aalu.personalToolbar.v1";
-let data=load(),view=null,page=0; // view=null -> ring, else section key
+const settingsKey="aalu.settings.v1";
+let data=load(),settings=loadSettings(),view=null,page=0; // view=null -> ring, else section key
 const panel=document.getElementById("panel"),center=document.getElementById("center");
+
+function loadSettings(){try{const s=JSON.parse(localStorage.getItem(settingsKey)||"{}");return{hideOnCapture:s.hideOnCapture!==false}}catch(e){return{hideOnCapture:true}}}
+function persistSettings(){localStorage.setItem(settingsKey,JSON.stringify(settings));window.ipc?.postMessage?.(JSON.stringify({t:"set-setting",hide_on_capture:settings.hideOnCapture}))}
+window.__setSettings=function(s){if(s&&typeof s.hideOnCapture==="boolean"){settings.hideOnCapture=s.hideOnCapture;try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(e){}render()}};
+
 function load(){try{return JSON.parse(localStorage.getItem(key)||"{}")}catch{return{}}}
 function persist(){localStorage.setItem(key,JSON.stringify(data))}
 function hue(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h}
@@ -57,6 +73,7 @@ function badge(x){const el=document.createElement("div");el.className="badge";if
 function itemSlot(i,x,removable,idx,listKey){const d=slot(i,'<div class="ico"></div><div class="lbl"></div>',()=>activate(x));d.querySelector(".ico").append(badge(x));d.querySelector(".lbl").textContent=x.name;
  if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){data[listKey].splice(idx,1);persist();render()}}}
 function addSlot(i,listKey,label){slot(i,'<div class="ico">＋</div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
+
 function render(){clear();
  if(view===null){
   center.innerHTML="Close<small>Esc or click</small>";
@@ -64,21 +81,37 @@ function render(){clear();
   sectionSlot(8,BOOKMARKS[0],BOOKMARKS[1]);
   const apps=data.Apps||[];
   for(let n=0;n<4;n++){const a=apps[n];if(a)itemSlot(4+n,a,true,n,"Apps");else if(n===apps.length)addSlot(4+n,"Apps","Add app")}
+ }else if(view==="Settings"){
+  center.innerHTML="Settings<small>Click option to toggle · Back</small>";
+  const isHide=settings.hideOnCapture!==false;
+  slot(0,
+    `<div class="ico"><div class="badge ${isHide?'toggle-on':'toggle-off'}">${isHide?'✓':'✕'}</div></div>`+
+    `<div class="lbl">Hide on SS</div>`+
+    `<div class="sublbl ${isHide?'':'off'}">${isHide?'ON (Hidden)':'OFF (Visible)'}</div>`,
+    ()=>{
+      settings.hideOnCapture=!isHide;
+      persistSettings();
+      render();
+    }
+  );
  }else{
-  const list=(view==="Window Manager"?WM.map(([icon,name,target])=>({icon,name,target,kind:"action"})):[]).concat(data[view]||[]);
+  const list=(view==="Window Manager"?WM.map(([icon,name,target])=>({icon,name,target,kind:target==="settings"?"settings":"action"})):[]).concat(data[view]||[]);
   const per=8,pages=Math.max(1,Math.ceil((list.length+1)/per));
   if(page>=pages)page=pages-1;
   center.innerHTML=view+"<small>"+(pages>1?"Page "+(page+1)+"/"+pages+" · scroll · ":"")+"click to go back</small>";
   const base=(view==="Window Manager"?WM.length:0);
   const slice=list.slice(page*per,page*per+per);
-  slice.forEach((x,n)=>{const gi=page*per+n;itemSlot(n,x,x.kind!=="action",gi-base,view)});
-  if(slice.length<per)addSlot(slice.length,view,"Add");
+  slice.forEach((x,n)=>{const gi=page*per+n;itemSlot(n,x,x.kind!=="action"&&x.kind!=="settings",gi-base,view)});
+  if(slice.length<per&&view!=="Window Manager")addSlot(slice.length,view,"Add");
  }}
+
 function activate(x){
+ if(x.target==="settings"||x.kind==="settings"){view="Settings";page=0;render();return}
  if(x.kind==="action"){window.ipc.postMessage(x.target);return}
  if(x.kind==="text"){navigator.clipboard?.writeText(x.target);return}
  if(x.kind==="app"){window.ipc.postMessage(JSON.stringify({t:"launch-app",target:x.target}));window.ipc.postMessage("close");return}
  if(x.kind==="url"){let u=x.target;if(!/^https?:\/\//i.test(u))u="https://"+u;window.ipc.postMessage(JSON.stringify({t:"open-url",target:u}));window.ipc.postMessage("close")}}
+
 let addTo=null;
 function openModal(listKey){addTo=listKey;const k=document.getElementById("kind");document.getElementById("name").value="";document.getElementById("target").value="";
  k.value=listKey==="Apps"||listKey==="Folders"?"app":listKey==="Commands"?"text":"url";document.getElementById("modal").classList.add("open");document.getElementById("name").focus()}
@@ -88,6 +121,9 @@ center.onclick=()=>{if(view===null)window.ipc.postMessage("close");else{view=nul
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(document.getElementById("modal").classList.contains("open"))document.getElementById("modal").classList.remove("open");else if(view!==null){view=null;render()}else window.ipc.postMessage("close")}});
 document.addEventListener("wheel",e=>{if(view===null)return;page=Math.max(0,page+(e.deltaY>0?1:-1));render()},{passive:true});
 window.__reset=()=>{view=null;page=0;document.getElementById("modal").classList.remove("open");render()};
+
+// Initial sync with backend
+try{window.ipc?.postMessage?.(JSON.stringify({t:"set-setting",hide_on_capture:settings.hideOnCapture}))}catch(e){}
 render();
 </script>
 </body></html>

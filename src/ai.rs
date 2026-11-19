@@ -150,7 +150,7 @@ enum AttemptError {
     /// Could not reach the provider.
     Network(String),
     /// The stream broke after some text had already been shown.
-    Midstream { partial: String, message: String },
+    Midstream { message: String },
 }
 
 fn describe(error: &AttemptError) -> String {
@@ -223,7 +223,7 @@ fn attempt(
                 return Err(if full.is_empty() {
                     AttemptError::Network(short(&error.to_string()))
                 } else {
-                    AttemptError::Midstream { partial: full, message: short(&error.to_string()) }
+                    AttemptError::Midstream { message: short(&error.to_string()) }
                 });
             }
         };
@@ -241,7 +241,7 @@ fn attempt(
             return Err(if full.is_empty() {
                 AttemptError::Rejected { status: 0, detail: short(message) }
             } else {
-                AttemptError::Midstream { partial: full, message: short(message) }
+                AttemptError::Midstream { message: short(message) }
             });
         }
         if let Some(piece) = value["choices"][0]["delta"]["content"].as_str() {

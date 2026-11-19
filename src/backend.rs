@@ -40,6 +40,9 @@ pub struct Deps {
     pub screen_text: fn() -> Result<String, String>,
     /// Captures the screen and returns a base64 JPEG.
     pub screen_jpeg: fn() -> Result<String, String>,
+    /// Returns true when the robot/chat windows should be hidden during screen capture.
+    /// Controlled by the "Hide Aalu on screenshot" toggle in the Personal Toolbar settings.
+    pub hide_on_capture: fn() -> bool,
 }
 
 pub struct Backend {
@@ -210,13 +213,32 @@ fn run_send(
 
     if screen != ScreenMode::Off {
         emit(Out::Js(chat::js_notice("Looking at your screen...")));
-        emit(Out::Overlays(false));
+
+        // Only hide the robot/chat windows if the user has enabled that in Settings.
+        let should_hide = (deps.hide_on_capture)();
+        if should_hide {
+            emit(Out::Overlays(false));
+        }
+
+        // RAII guard: always restore overlays even if the capture panics or returns early.
+        // Without this, a crash between Overlays(false) and Overlays(true) leaves the robot
+        // permanently invisible while audio (voice call, reminder beeps) continues playing.
+        struct ShowOnDrop<'a>(&'a Emit, bool);
+        impl Drop for ShowOnDrop<'_> {
+            fn drop(&mut self) {
+                if self.1 { (self.0)(Out::Overlays(true)); }
+            }
+        }
+        let _restore = ShowOnDrop(emit, should_hide);
+
         thread::sleep(HIDE_DELAY);
         let captured = match screen {
             ScreenMode::Text => (deps.screen_text)().map(|screen_text| content = chat::with_screen_text(&text, &screen_text)),
             _ => (deps.screen_jpeg)().map(|b64| image = Some(b64)),
         };
-        emit(Out::Overlays(true));
+        // _restore drops here, firing Overlays(true) only if we hid them.
+        drop(_restore);
+
         if let Err(error) = captured {
             emit(Out::Js(chat::js_error(&format!("Screen read failed: {error}"))));
             return;
@@ -335,6 +357,7 @@ mod tests {
             key_set: |_, _| Ok(()),
             screen_text: || Ok("INVOICE 42".into()),
             screen_jpeg: || Ok("QUJD".into()),
+            hide_on_capture: || true,
         }
     }
 

@@ -101,7 +101,7 @@ fn launch_windows_voice_typing() {
 fn start_right_hold_watcher() {
     let _ = thread::Builder::new().name("aalu-right-hold".into()).spawn(|| loop {
         thread::sleep(Duration::from_millis(20));
-        let mut press = lock(&RIGHT_PRESS);
+        let press = lock(&RIGHT_PRESS);
         if !RIGHT_LONG_TRIGGERED.load(Ordering::Relaxed)
             && press.map(|started| started.elapsed() >= Duration::from_secs(1)).unwrap_or(false)
         {
