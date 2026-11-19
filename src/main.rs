@@ -338,6 +338,13 @@ fn main() -> wry::Result<()> {
             Event::UserEvent(AppEvent::ToolbarMessage(raw)) => {
                 if raw == "close" {
                     if let Some(window) = toolbar_window.as_ref() { window.set_visible(false); }
+                } else if matches!(raw.as_str(), "toggle-robot" | "open-chat" | "open-scheduler") {
+                    if let Some(window) = toolbar_window.as_ref() { window.set_visible(false); }
+                    let _ = proxy.send_event(match raw.as_str() {
+                        "toggle-robot" => AppEvent::ToggleRobotHotkey,
+                        "open-chat" => AppEvent::ToggleChatHotkey,
+                        _ => AppEvent::ToggleSchedulerHotkey,
+                    });
                 } else if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&raw) {
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
