@@ -46,6 +46,7 @@ static RIGHT_PRESS: Mutex<Option<Instant>> = Mutex::new(None);
 static RIGHT_LONG_TRIGGERED: AtomicBool = AtomicBool::new(false);
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct NativeRect { left: i32, top: i32, right: i32, bottom: i32 }
 type MonitorCallback = unsafe extern "system" fn(*mut std::ffi::c_void, *mut std::ffi::c_void, *mut NativeRect, isize) -> i32;
 
@@ -53,30 +54,33 @@ type MonitorCallback = unsafe extern "system" fn(*mut std::ffi::c_void, *mut std
 extern "system" {
     fn EnumDisplayMonitors(hdc: *mut std::ffi::c_void, clip: *const NativeRect, callback: Option<MonitorCallback>, data: isize) -> i32;
     fn keybd_event(vk: u8, scan: u8, flags: u32, extra: usize);
-    fn mouse_event(flags: u32, dx: u32, dy: u32, data: u32, extra: usize);
+    #[link_name = "mouse_event"]
+    fn win_mouse_event(flags: u32, dx: u32, dy: u32, data: u32, extra: usize);
 }
 
 unsafe extern "system" fn collect_monitor(_: *mut std::ffi::c_void, _: *mut std::ffi::c_void, rect: *mut NativeRect, data: isize) -> i32 {
     if !rect.is_null() {
-        let monitors = &mut *(data as *mut Vec<(i32, i32)>);
+        let monitors = &mut *(data as *mut Vec<NativeRect>);
         let r = &*rect;
-        monitors.push((r.left + (r.right-r.left)/2, r.top + (r.bottom-r.top)/2));
+        monitors.push(*r);
     }
     1
 }
 
 fn cycle_monitor_cursor() {
     unsafe {
-        let mut monitors = Vec::<(i32, i32)>::new();
+        let mut monitors = Vec::<NativeRect>::new();
         let _ = EnumDisplayMonitors(std::ptr::null_mut(), std::ptr::null(), Some(collect_monitor), &mut monitors as *mut _ as isize);
         if monitors.len() < 2 { return; }
         let mut cursor = POINT { x: 0, y: 0 };
         if GetCursorPos(&mut cursor).is_err() { return; }
-        let current = monitors.iter().position(|(x,y)| {
-            cursor.x >= *x - 1000 && cursor.x <= *x + 1000 && cursor.y >= *y - 1000 && cursor.y <= *y + 1000
+        let current = monitors.iter().position(|r| {
+            cursor.x >= r.left && cursor.x < r.right && cursor.y >= r.top && cursor.y < r.bottom
         }).unwrap_or(0);
         let next = monitors[(current + 1) % monitors.len()];
-        let _ = SetCursorPos(next.0, next.1);
+        let x = next.left + (next.right - next.left) / 2;
+        let y = next.top + (next.bottom - next.top) / 2;
+        let _ = SetCursorPos(x, y);
     }
 }
 
@@ -277,8 +281,8 @@ fn mouse_event(w: WPARAM, l: LPARAM) -> bool {
                 }
                 // A short press remains an ordinary right-click. Injected events bypass this hook.
                 unsafe {
-                    mouse_event(0x0008, 0, 0, 0, 0); // RIGHTDOWN
-                    mouse_event(0x0010, 0, 0, 0, 0); // RIGHTUP
+                    win_mouse_event(0x0008, 0, 0, 0, 0); // RIGHTDOWN
+                    win_mouse_event(0x0010, 0, 0, 0, 0); // RIGHTUP
                 }
                 return true;
             }
