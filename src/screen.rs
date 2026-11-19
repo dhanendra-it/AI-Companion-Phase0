@@ -64,6 +64,9 @@ pub fn capture_screen() -> Result<Shot, String> {
             ..Default::default()
         };
         let mut pixels = vec![0u8; width as usize * height as usize * 4];
+        // GetDIBits requires the bitmap not to be selected into a DC.
+        // Deselect it before reading the pixel buffer.
+        SelectObject(memory, previous);
         let rows = GetDIBits(
             memory,
             bitmap,
@@ -73,8 +76,6 @@ pub fn capture_screen() -> Result<Shot, String> {
             &mut info,
             DIB_RGB_COLORS,
         );
-
-        SelectObject(memory, previous);
         let _ = DeleteObject(bitmap);
         let _ = DeleteDC(memory);
         ReleaseDC(None, screen);
