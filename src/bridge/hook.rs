@@ -28,7 +28,7 @@ use windows::{
             WindowsAndMessaging::{
                 CallNextHookEx, GetCursorPos, GetForegroundWindow, GetMessageW, GetSystemMetrics,
                 GetWindowThreadProcessId, SetCursorPos, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT,
-                LLKHF_INJECTED, LLMHF_INJECTED, MSG, MSLLHOOKSTRUCT, SM_CXSCREEN, SM_CYSCREEN,
+                LLKHF_EXTENDED, LLKHF_INJECTED, LLMHF_INJECTED, MSG, MSLLHOOKSTRUCT, SM_CXSCREEN, SM_CYSCREEN,
                 WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_MOUSEMOVE, WM_SYSKEYDOWN,
             },
         },
@@ -124,11 +124,12 @@ fn key_event(w: WPARAM, l: LPARAM) -> bool {
     let msg = w.0 as u32;
     let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
     let tablet = sh.tablet.load(Ordering::Relaxed);
-    if k.vkCode == 0xA1 || k.vkCode == 0xA3 {
-        super::log(&format!("shortcut key vk={:#x} down={down} tablet={tablet}", k.vkCode)); // only the two shortcut keys
+    let extended = k.flags.0 & LLKHF_EXTENDED.0 != 0;
+    if matches!(k.vkCode, 0x10..=0x12 | 0xA0..=0xA5) {
+        super::log(&format!("modifier vk={:#x} scan={:#x} extended={extended} down={down} tablet={tablet}", k.vkCode, k.scanCode));
     }
 
-    let action = lock(keys).on_key(k.vkCode, k.scanCode, down, tablet, &mut to_text);
+    let action = lock(keys).on_key(k.vkCode, k.scanCode, extended, down, tablet, &mut to_text);
     match action {
         KeyAction::Pass => false,
         KeyAction::Swallow => true,

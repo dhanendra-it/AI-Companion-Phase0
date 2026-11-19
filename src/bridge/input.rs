@@ -43,6 +43,17 @@ fn is_modifier_or_lock(vk: u32) -> bool {
     matches!(vk, 0x10 | 0x11 | 0x12 | 0x5B | 0x5C | 0x5D | 0x90 | 0x91) || (0xA0..=0xA5).contains(&vk)
 }
 
+/// Some keyboard drivers report sided modifiers as generic VK_SHIFT/VK_CONTROL values.
+/// Recover the right-side identity from the native scan code / extended-key flag.
+fn normalize_vk(vk: u32, scan: u32, extended: bool) -> u32 {
+    match vk {
+        0x10 => if scan == 0x36 { 0xA1 } else { 0xA0 }, // VK_SHIFT -> left/right Shift
+        0x11 => if extended { 0xA3 } else { 0xA2 },   // VK_CONTROL -> left/right Ctrl
+        0x12 => if extended { 0xA5 } else { 0xA4 },   // VK_MENU -> left/right Alt
+        _ => vk,
+    }
+}
+
 fn letter_digit(vk: u32) -> Option<i32> {
     match vk {
         0x41..=0x5A => Some(29 + (vk as i32 - 0x41)), // A..Z
@@ -85,10 +96,12 @@ impl KeyTracker {
         &mut self,
         vk: u32,
         scan: u32,
+        extended: bool,
         down: bool,
         tablet: bool,
         to_text: &mut dyn FnMut(u32, u32, bool, bool) -> Option<String>,
     ) -> KeyAction {
+        let vk = normalize_vk(vk, scan, extended);
         if vk > 255 {
             return KeyAction::Pass;
         }
@@ -291,7 +304,7 @@ mod tests {
                 None
             }
         };
-        t.on_key(vk, 0, down, tablet, &mut to_text)
+        t.on_key(vk, 0, false, down, tablet, &mut to_text)
     }
 
     #[test]
@@ -315,8 +328,8 @@ mod tests {
     fn chord_returns_from_tablet_mode_even_when_swallowed_ctrl_is_not_visible_to_windows() {
         let mut t = KeyTracker::new(&DEFAULT_HOTKEY);
         let mut none = |_: u32, _: u32, _: bool, _: bool| None;
-        assert_eq!(t.on_key(RCTRL, 0, true, true, &mut none), KeyAction::Swallow);
-        assert_eq!(t.on_key(RSHIFT, 0, true, true, &mut none), KeyAction::Toggle);
+        assert_eq!(t.on_key(RCTRL, 0, true, true, true, &mut none), KeyAction::Swallow);
+        assert_eq!(t.on_key(RSHIFT, 0, false, true, true, &mut none), KeyAction::Toggle);
     }
 
     #[test]
