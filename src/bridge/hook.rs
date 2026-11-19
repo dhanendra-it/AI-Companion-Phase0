@@ -50,9 +50,13 @@ static RIGHT_LONG_TRIGGERED: AtomicBool = AtomicBool::new(false);
 struct NativeRect { left: i32, top: i32, right: i32, bottom: i32 }
 type MonitorCallback = unsafe extern "system" fn(*mut std::ffi::c_void, *mut std::ffi::c_void, *mut NativeRect, isize) -> i32;
 
-#[link(name = "user32")]
+#[link(name = "gdi32")]
 extern "system" {
     fn EnumDisplayMonitors(hdc: *mut std::ffi::c_void, clip: *const NativeRect, callback: Option<MonitorCallback>, data: isize) -> i32;
+}
+
+#[link(name = "user32")]
+extern "system" {
     fn keybd_event(vk: u8, scan: u8, flags: u32, extra: usize);
     #[link_name = "mouse_event"]
     fn win_mouse_event(flags: u32, dx: u32, dy: u32, data: u32, extra: usize);
