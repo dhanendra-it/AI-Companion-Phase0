@@ -78,7 +78,7 @@ function sectionSlot(i,k,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32
 function badge(x){const el=document.createElement("div");el.className="badge";if(x.icon&&ICONS[x.icon]){el.style.background="rgba(255,255,255,.1)";el.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+ICONS[x.icon]+'</svg>'}else{const h=hue(x.name);el.style.background="linear-gradient(145deg,hsl("+h+" 70% 58%),hsl("+(h+40)+" 70% 38%))";el.textContent=(x.name[0]||"?").toUpperCase()}return el}
 function itemSlot(i,x,removable,idx,listKey){const d=slot(i,'<div class="ico"></div><div class="lbl"></div>',()=>activate(x));d.querySelector(".ico").append(badge(x));d.querySelector(".lbl").textContent=x.name;
  if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){data[listKey].splice(idx,1);persist();render()}}}
-function addSlot(i,listKey,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32"><path d="'+ICONS.plus+'"/></svg></div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
+function addSlot(i,listKey,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+ICONS.plus+'</svg></div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
 
 function render(){clear();
  if(view===null){
