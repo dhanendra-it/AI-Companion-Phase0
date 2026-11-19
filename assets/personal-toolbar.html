@@ -16,7 +16,7 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 .ico svg{width:34px;height:34px;fill:none;stroke:#ecedf2;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ico .chev{position:absolute;right:-4px;bottom:2px;font-size:12px;color:#b9bcc7}
 .badge{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:19px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px rgba(0,0,0,.35)}
-.lbl{margin-top:6px;font-size:11.5px;font-weight:600;color:#e7e8ee;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.lbl{margin-top:6px;font-size:11.5px;font-weight:600;color:#e7e8ee;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sublbl{font-size:10px;color:#5eead4;font-weight:700;margin-top:2px;white-space:nowrap}
 .sublbl.off{color:#f87171}
 .toggle-on{background:linear-gradient(135deg,#0e9f6e,#057a55)!important;color:#fff!important;box-shadow:0 0 14px rgba(14,159,110,0.55)!important}
@@ -46,13 +46,19 @@ const SVG={
  Settings:'<circle cx="16" cy="16" r="4"/><path d="M16 3v4M16 25v4M3 16h4M25 16h4M6.8 6.8l2.8 2.8M22.4 22.4l2.8 2.8M6.8 25.2l2.8-2.8M22.4 9.6l2.8-2.8"/>'
 };
 // Ring order: [section key, label]. "Apps" slots (4-7) are filled from the user's pinned apps.
-const TOP=[["Commands","Text Snippets"],["Shortcuts","Shortcuts"],["Folders","Folders"],["Window Manager","Window Manager"]];
-const BOOKMARKS=["Bookmarks","Bookmarks"];
+const TOP=[["Commands","Text Snippets"],["Shortcuts","Shortcuts"],["Folders","Folders"],["Bookmarks","Bookmarks"]];
+const ICONS={
+ robot:'<rect x="7" y="8" width="18" height="16" rx="5"/><path d="M16 4v4M12 15h.01M20 15h.01M12 20h8M4 13v6m24-6v6"/>',
+ chat:'<path d="M5 6.5A3.5 3.5 0 0 1 8.5 3h15A3.5 3.5 0 0 1 27 6.5v11a3.5 3.5 0 0 1-3.5 3.5H13l-7 5v-5.7a3.5 3.5 0 0 1-1-2.8z"/><path d="M10 10h12M10 15h8"/>',
+ calendar:'<rect x="4" y="6" width="24" height="22" rx="3"/><path d="M10 3v6m12-6v6M4 12h24M10 18h4m4 0h4m-12 5h4"/>',
+ check:'<path d="m6 16 6 6L26 8"/>',
+ eyeOff:'<path d="m3 3 26 26M13.6 13.6a3.4 3.4 0 0 0 4.8 4.8"/><path d="M10.6 6.8A15 15 0 0 1 16 6c7 0 11 7 11 7a18 18 0 0 1-4 4.6M6.2 9.2C3.8 11 2 13 2 13s4 7 14 7c1.1 0 2.1-.1 3-.4"/>',
+ plus:'<path d="M16 6v20M6 16h20"/>'
+};
 const WM=[
-  ["▱","Show / hide Aalu","toggle-robot"],
-  ["◫","Open chat","open-chat"],
-  ["◷","Open scheduler","open-scheduler"],
-  ["⚙","Settings","settings"]
+  {icon:"robot",name:"Show / hide Aalu",target:"toggle-robot",kind:"action"},
+  {icon:"chat",name:"Open chat",target:"open-chat",kind:"action"},
+  {icon:"calendar",name:"Open scheduler",target:"open-scheduler",kind:"action"}
 ];
 const key="aalu.personalToolbar.v1";
 const settingsKey="aalu.settings.v1";
@@ -69,23 +75,23 @@ function hue(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h}
 function clear(){panel.querySelectorAll(".slot").forEach(e=>e.remove())}
 function slot(i,html,onclick,extra){const[x,y]=SLOTS[i];const d=document.createElement("div");d.className="slot"+(extra||"");d.style.left=x+"%";d.style.top=y+"%";d.innerHTML=html;d.onclick=onclick;panel.append(d);return d}
 function sectionSlot(i,k,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+SVG[k]+'</svg><span class="chev">›</span></div><div class="lbl">'+label+'</div>',()=>{view=k;page=0;render()})}
-function badge(x){const el=document.createElement("div");el.className="badge";if(x.icon){el.style.background="rgba(255,255,255,.1)";el.textContent=x.icon}else{const h=hue(x.name);el.style.background="linear-gradient(145deg,hsl("+h+" 70% 58%),hsl("+(h+40)+" 70% 38%))";el.textContent=(x.name[0]||"?").toUpperCase()}return el}
+function badge(x){const el=document.createElement("div");el.className="badge";if(x.icon&&ICONS[x.icon]){el.style.background="rgba(255,255,255,.1)";el.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+ICONS[x.icon]+'</svg>'}else{const h=hue(x.name);el.style.background="linear-gradient(145deg,hsl("+h+" 70% 58%),hsl("+(h+40)+" 70% 38%))";el.textContent=(x.name[0]||"?").toUpperCase()}return el}
 function itemSlot(i,x,removable,idx,listKey){const d=slot(i,'<div class="ico"></div><div class="lbl"></div>',()=>activate(x));d.querySelector(".ico").append(badge(x));d.querySelector(".lbl").textContent=x.name;
  if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){data[listKey].splice(idx,1);persist();render()}}}
-function addSlot(i,listKey,label){slot(i,'<div class="ico">＋</div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
+function addSlot(i,listKey,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32"><path d="'+ICONS.plus+'"/></svg></div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
 
 function render(){clear();
  if(view===null){
   center.innerHTML="Close<small>Esc or click</small>";
   TOP.forEach(([k,l],n)=>sectionSlot(n,k,l));
-  sectionSlot(8,BOOKMARKS[0],BOOKMARKS[1]);
+  sectionSlot(8,"Settings","Settings");
   const apps=data.Apps||[];
   for(let n=0;n<4;n++){const a=apps[n];if(a)itemSlot(4+n,a,true,n,"Apps");else if(n===apps.length)addSlot(4+n,"Apps","Add app")}
  }else if(view==="Settings"){
   center.innerHTML="Settings<small>Click option to toggle · Back</small>";
   const isHide=settings.hideOnCapture!==false;
   slot(0,
-    `<div class="ico"><div class="badge ${isHide?'toggle-on':'toggle-off'}">${isHide?'✓':'✕'}</div></div>`+
+    `<div class="ico"><div class="badge ${isHide?'toggle-on':'toggle-off'}"><svg viewBox="0 0 32 32">${isHide?ICONS.check:ICONS.eyeOff}</svg></div></div>`+
     `<div class="lbl">Hide on SS</div>`+
     `<div class="sublbl ${isHide?'':'off'}">${isHide?'ON (Hidden)':'OFF (Visible)'}</div>`,
     ()=>{
@@ -95,7 +101,7 @@ function render(){clear();
     }
   );
  }else{
-  const list=(view==="Window Manager"?WM.map(([icon,name,target])=>({icon,name,target,kind:target==="settings"?"settings":"action"})):[]).concat(data[view]||[]);
+  const list=(view==="Window Manager"?WM:[]).concat(data[view]||[]);
   const per=8,pages=Math.max(1,Math.ceil((list.length+1)/per));
   if(page>=pages)page=pages-1;
   center.innerHTML=view+"<small>"+(pages>1?"Page "+(page+1)+"/"+pages+" · scroll · ":"")+"click to go back</small>";
