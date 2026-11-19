@@ -272,7 +272,6 @@ fn main() -> wry::Result<()> {
         .with_transparent(true)
         .with_always_on_top(true)
         .with_skip_taskbar(true)
-        .with_content_protection(true)
         .with_visible(false)
         .build(&event_loop)
         .expect("create robot window");
@@ -332,6 +331,7 @@ fn main() -> wry::Result<()> {
     let mut toolbar_window: Option<Window> = None;
     let mut toolbar_webview: Option<WebView> = None;
     let mut toolbar_was_visible = false;
+    let mut tablet_status_was_visible = false;
 
     event_loop.run(move |event, target, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -682,9 +682,17 @@ fn main() -> wry::Result<()> {
                         if !show {
                             toolbar_was_visible = toolbar_window.as_ref().map(Window::is_visible).unwrap_or(false);
                             if let Some(window) = toolbar_window.as_ref() { window.set_visible(false); }
-                        } else if toolbar_was_visible {
-                            if let Some(window) = toolbar_window.as_ref() { window.set_visible(true); }
-                            toolbar_was_visible = false;
+                            tablet_status_was_visible = tablet_status_window.as_ref().map(Window::is_visible).unwrap_or(false);
+                            if let Some(window) = tablet_status_window.as_ref() { window.set_visible(false); }
+                        } else {
+                            if toolbar_was_visible {
+                                if let Some(window) = toolbar_window.as_ref() { window.set_visible(true); }
+                                toolbar_was_visible = false;
+                            }
+                            if tablet_status_was_visible {
+                                if let Some(window) = tablet_status_window.as_ref() { window.set_visible(true); }
+                                tablet_status_was_visible = false;
+                            }
                         }
                     }
 
@@ -789,8 +797,7 @@ fn show_tablet_status(
             .with_resizable(false)
             .with_always_on_top(true)
             .with_skip_taskbar(true)
-            .with_content_protection(true)
-            .with_visible(false)
+                .with_visible(false)
             .build(target)
         {
             Ok(window) => window,
@@ -1018,7 +1025,6 @@ fn open_chat(
         .with_always_on_top(true)
         .with_decorations(false)
         .with_resizable(true)
-        .with_content_protection(true)
         .build(target)
     {
         Ok(w) => w,
@@ -1092,7 +1098,6 @@ fn open_scheduler(
         .with_always_on_top(true)
         .with_decorations(false)
         .with_resizable(true)
-        .with_content_protection(true)
         .build(target)
     {
         Ok(w) => w,
@@ -1174,7 +1179,6 @@ fn toggle_toolbar(
         .with_transparent(true)
         .with_skip_taskbar(true)
         .with_resizable(false)
-        .with_content_protection(true)
         .build(target)
     {
         Ok(window) => window,
