@@ -15,8 +15,9 @@ use super::{
 };
 use std::{
     panic::catch_unwind,
-    sync::{atomic::Ordering, Arc, Mutex, OnceLock},
+    sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex, OnceLock},
     thread,
+    time::{Duration, Instant},
 };
 use windows::{
     core::PCWSTR,
@@ -40,11 +41,73 @@ static KEYS: OnceLock<Mutex<KeyTracker>> = OnceLock::new();
 static MOUSE: OnceLock<Mutex<MouseTracker>> = OnceLock::new();
 /// Where the laptop cursor was when tablet mode started.
 static SAVED_CURSOR: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+static ALT_W_HELD: AtomicBool = AtomicBool::new(false);
+static RIGHT_PRESS: Mutex<Option<Instant>> = Mutex::new(None);
+static RIGHT_LONG_TRIGGERED: AtomicBool = AtomicBool::new(false);
+
+#[repr(C)]
+struct NativeRect { left: i32, top: i32, right: i32, bottom: i32 }
+type MonitorCallback = unsafe extern "system" fn(*mut std::ffi::c_void, *mut std::ffi::c_void, *mut NativeRect, isize) -> i32;
+
+#[link(name = "user32")]
+extern "system" {
+    fn EnumDisplayMonitors(hdc: *mut std::ffi::c_void, clip: *const NativeRect, callback: Option<MonitorCallback>, data: isize) -> i32;
+    fn keybd_event(vk: u8, scan: u8, flags: u32, extra: usize);
+    fn mouse_event(flags: u32, dx: u32, dy: u32, data: u32, extra: usize);
+}
+
+unsafe extern "system" fn collect_monitor(_: *mut std::ffi::c_void, _: *mut std::ffi::c_void, rect: *mut NativeRect, data: isize) -> i32 {
+    if !rect.is_null() {
+        let monitors = &mut *(data as *mut Vec<(i32, i32)>);
+        let r = &*rect;
+        monitors.push((r.left + (r.right-r.left)/2, r.top + (r.bottom-r.top)/2));
+    }
+    1
+}
+
+fn cycle_monitor_cursor() {
+    unsafe {
+        let mut monitors = Vec::<(i32, i32)>::new();
+        let _ = EnumDisplayMonitors(std::ptr::null_mut(), std::ptr::null(), Some(collect_monitor), &mut monitors as *mut _ as isize);
+        if monitors.len() < 2 { return; }
+        let mut cursor = POINT { x: 0, y: 0 };
+        if GetCursorPos(&mut cursor).is_err() { return; }
+        let current = monitors.iter().position(|(x,y)| {
+            cursor.x >= *x - 1000 && cursor.x <= *x + 1000 && cursor.y >= *y - 1000 && cursor.y <= *y + 1000
+        }).unwrap_or(0);
+        let next = monitors[(current + 1) % monitors.len()];
+        let _ = SetCursorPos(next.0, next.1);
+    }
+}
+
+fn launch_windows_voice_typing() {
+    const KEYEVENTF_KEYUP: u32 = 0x0002;
+    unsafe {
+        keybd_event(0x5B, 0, 0, 0); // Left Windows down
+        keybd_event(b'H', 0, 0, 0);
+        keybd_event(b'H', 0, KEYEVENTF_KEYUP, 0);
+        keybd_event(0x5B, 0, KEYEVENTF_KEYUP, 0);
+    }
+}
+
+fn start_right_hold_watcher() {
+    let _ = thread::Builder::new().name("aalu-right-hold".into()).spawn(|| loop {
+        thread::sleep(Duration::from_millis(20));
+        let mut press = lock(&RIGHT_PRESS);
+        if !RIGHT_LONG_TRIGGERED.load(Ordering::Relaxed)
+            && press.map(|started| started.elapsed() >= Duration::from_secs(1)).unwrap_or(false)
+        {
+            RIGHT_LONG_TRIGGERED.store(true, Ordering::Relaxed);
+            launch_windows_voice_typing();
+        }
+    });
+}
 
 pub fn start(shared: Arc<Shared>) {
     let _ = SHARED.set(shared.clone());
     let _ = KEYS.set(Mutex::new(KeyTracker::new(&DEFAULT_HOTKEY)));
     let _ = MOUSE.set(Mutex::new(MouseTracker::new()));
+    start_right_hold_watcher();
     let hook_shared = shared.clone();
     let spawned = thread::Builder::new().name("deskbridge-hook".into()).spawn(move || unsafe { run(hook_shared) });
     if let Err(e) = spawned {
@@ -123,6 +186,14 @@ fn key_event(w: WPARAM, l: LPARAM) -> bool {
     let (Some(sh), Some(keys)) = (SHARED.get(), KEYS.get()) else { return false };
     let msg = w.0 as u32;
     let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+    // Alt+W cycles the cursor through connected displays in normal laptop mode.
+    if k.vkCode == 0x57 {
+        if down && (unsafe { GetKeyState(0x12) as u16 } & 0x8000 != 0) {
+            if !ALT_W_HELD.swap(true, Ordering::Relaxed) { cycle_monitor_cursor(); }
+            return true;
+        }
+        if !down && ALT_W_HELD.swap(false, Ordering::Relaxed) { return true; }
+    }
     let tablet = sh.tablet.load(Ordering::Relaxed);
     let extended = k.flags.0 & LLKHF_EXTENDED.0 != 0;
     if matches!(k.vkCode, 0x10..=0x12 | 0xA0..=0xA5) {
@@ -185,14 +256,39 @@ unsafe extern "system" fn mouse_proc(code: i32, w: WPARAM, l: LPARAM) -> LRESULT
 /// Returns true to swallow the event.
 fn mouse_event(w: WPARAM, l: LPARAM) -> bool {
     let Some(sh) = SHARED.get() else { return false };
-    if !sh.tablet.load(Ordering::Relaxed) {
+    let m = unsafe { *(l.0 as *const MSLLHOOKSTRUCT) };
+    let msg = w.0 as u32;
+
+    // In laptop mode, reserve a one-second right-button hold for native Windows Voice Typing.
+    // Swallow the physical down; replay a normal click only if the button is released early.
+    if !sh.tablet.load(Ordering::Relaxed) && m.flags & LLMHF_INJECTED == 0 {
+        const WM_RBUTTONDOWN: u32 = 0x0204;
+        const WM_RBUTTONUP: u32 = 0x0205;
+        if msg == WM_RBUTTONDOWN {
+            *lock(&RIGHT_PRESS) = Some(Instant::now());
+            RIGHT_LONG_TRIGGERED.store(false, Ordering::Relaxed);
+            return true;
+        }
+        if msg == WM_RBUTTONUP {
+            let was_pressed = lock(&RIGHT_PRESS).take().is_some();
+            if was_pressed {
+                if RIGHT_LONG_TRIGGERED.swap(false, Ordering::Relaxed) {
+                    return true;
+                }
+                // A short press remains an ordinary right-click. Injected events bypass this hook.
+                unsafe {
+                    mouse_event(0x0008, 0, 0, 0, 0); // RIGHTDOWN
+                    mouse_event(0x0010, 0, 0, 0, 0); // RIGHTUP
+                }
+                return true;
+            }
+        }
         return false;
     }
-    let m = unsafe { *(l.0 as *const MSLLHOOKSTRUCT) };
+    if !sh.tablet.load(Ordering::Relaxed) { return false; }
     if m.flags & LLMHF_INJECTED != 0 {
         return false; // our own cursor parking, or another program
     }
-    let msg = w.0 as u32;
     let Some(tracker) = MOUSE.get() else { return false };
     let (out, anchor) = {
         let mut t = lock(tracker);
