@@ -331,6 +331,7 @@ fn main() -> wry::Result<()> {
     let mut scheduler_webview: Option<WebView> = None;
     let mut toolbar_window: Option<Window> = None;
     let mut toolbar_webview: Option<WebView> = None;
+    let mut toolbar_was_visible = false;
 
     event_loop.run(move |event, target, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -677,6 +678,13 @@ fn main() -> wry::Result<()> {
                         }
                         if let Some(window) = scheduler_window.as_ref() {
                             window.set_visible(show);
+                        }
+                        if !show {
+                            toolbar_was_visible = toolbar_window.as_ref().map(Window::is_visible).unwrap_or(false);
+                            if let Some(window) = toolbar_window.as_ref() { window.set_visible(false); }
+                        } else if toolbar_was_visible {
+                            if let Some(window) = toolbar_window.as_ref() { window.set_visible(true); }
+                            toolbar_was_visible = false;
                         }
                     }
 
