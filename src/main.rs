@@ -293,6 +293,8 @@ fn main() -> wry::Result<()> {
     });
 
     let mut is_reminder_active = false;
+    let mut bridge_tablet_mode = false;
+    let mut bridge_status: Option<String> = None;
     let mut scheduler_window: Option<Window> = None;
     let mut scheduler_webview: Option<WebView> = None;
 
@@ -342,7 +344,13 @@ fn main() -> wry::Result<()> {
             }
 
             Event::UserEvent(AppEvent::RobotMessage(message)) => {
-                if message == "open-chat" {
+                if message == "bridge-ready" {
+                    let _ = robot_webview.evaluate_script(&format!("window.__setTabletMode && window.__setTabletMode({bridge_tablet_mode})"));
+                    if let Some(status) = bridge_status.as_ref() {
+                        let text = serde_json::to_string(status).unwrap_or_default();
+                        let _ = robot_webview.evaluate_script(&format!("window.__tabletNotice && window.__tabletNotice({text})"));
+                    }
+                } else if message == "open-chat" {
                     open_chat(
                         target,
                         &robot_window,
@@ -533,14 +541,25 @@ fn main() -> wry::Result<()> {
 
             Event::UserEvent(AppEvent::Bridge(event)) => {
                 let js = match event {
-                    bridge::Event::Mode(on) => format!("window.__setTabletMode && window.__setTabletMode({on})"),
+                    bridge::Event::Mode(on) => {
+                        bridge_tablet_mode = on;
+                        format!("window.__setTabletMode && window.__setTabletMode({on})")
+                    }
                     bridge::Event::Refused(why) => {
+                        bridge_status = Some(why.clone());
                         let text = serde_json::to_string(&why).unwrap_or_else(|_| "\"\"".into());
                         format!("window.__tabletNotice && window.__tabletNotice({text})")
                     }
-                    // Connection changes are only worth a message when they are the reason the
-                    // shortcut would not work; the robot shows that when the shortcut is pressed.
-                    bridge::Event::Link { .. } => String::new(),
+                    bridge::Event::Link { connected, message } => {
+                        let text = if connected {
+                            "Tablet ready - press Right Ctrl + Right Shift".to_string()
+                        } else {
+                            message
+                        };
+                        bridge_status = Some(text.clone());
+                        let text = serde_json::to_string(&text).unwrap_or_else(|_| "\"Tablet status unavailable.\"".into());
+                        format!("window.__tabletNotice && window.__tabletNotice({text})")
+                    }
                 };
                 if !js.is_empty() {
                     let _ = robot_webview.evaluate_script(&js);

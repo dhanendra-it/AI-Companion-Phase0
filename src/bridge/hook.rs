@@ -42,23 +42,27 @@ static MOUSE: OnceLock<Mutex<MouseTracker>> = OnceLock::new();
 static SAVED_CURSOR: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 
 pub fn start(shared: Arc<Shared>) {
-    let _ = SHARED.set(shared);
+    let _ = SHARED.set(shared.clone());
     let _ = KEYS.set(Mutex::new(KeyTracker::new(&DEFAULT_HOTKEY)));
     let _ = MOUSE.set(Mutex::new(MouseTracker::new()));
-    let spawned = thread::Builder::new().name("deskbridge-hook".into()).spawn(|| unsafe { run() });
+    let hook_shared = shared.clone();
+    let spawned = thread::Builder::new().name("deskbridge-hook".into()).spawn(move || unsafe { run(hook_shared) });
     if let Err(e) = spawned {
         eprintln!("DeskBridge: could not start the hook thread: {e}");
+        shared.emit(super::Event::Refused(format!("DeskBridge shortcut could not start: {e}")));
     }
 }
 
-unsafe fn run() {
+unsafe fn run(shared: Arc<Shared>) {
     let hinst = GetModuleHandleW(PCWSTR::null()).map(HINSTANCE::from).unwrap_or_default();
     if let Err(e) = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), hinst, 0) {
         eprintln!("DeskBridge: could not install the keyboard hook: {e}");
+        shared.emit(super::Event::Refused(format!("DeskBridge shortcut unavailable: {e}")));
         return;
     }
     if let Err(e) = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), hinst, 0) {
         eprintln!("DeskBridge: could not install the mouse hook (keyboard still works): {e}");
+        shared.emit(super::Event::Refused(format!("DeskBridge mouse hook unavailable: {e}")));
     }
     // Low-level hooks are called from this thread's message loop.
     let mut msg = MSG::default();

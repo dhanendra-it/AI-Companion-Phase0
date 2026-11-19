@@ -865,6 +865,7 @@ window.__tabletNotice = text => {
   if (tabletNoticeTimer) clearTimeout(tabletNoticeTimer);
   tabletNoticeTimer = setTimeout(() => { tabletNoticeTimer = null; showTabletBadge(); }, 6000);
 };
+sendToApp("bridge-ready");
 
 // Right click context menu to quit
 companion.addEventListener("contextmenu", event => {
