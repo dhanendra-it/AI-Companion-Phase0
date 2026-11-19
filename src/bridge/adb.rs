@@ -182,6 +182,7 @@ struct Linker {
 impl Linker {
     fn run(mut self) {
         let path = find_adb();
+        super::log(&format!("adb path: {}", path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "NOT FOUND".into())));
         *lock(&self.adb) = path.clone();
         if let Some(p) = &path {
             start_server(p);

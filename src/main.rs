@@ -545,6 +545,7 @@ fn main() -> wry::Result<()> {
             }
 
             Event::UserEvent(AppEvent::Bridge(event)) => {
+                bridge::log(&format!("ui got bridge event: {event:?}"));
                 match event {
                     bridge::Event::Mode(on) => {
                         bridge_tablet_mode = on;
@@ -726,7 +727,7 @@ fn show_tablet_status(
             .build(target)
         {
             Ok(window) => window,
-            Err(error) => { eprintln!("Could not create tablet status window: {error}"); return; }
+            Err(error) => { eprintln!("Could not create tablet status window: {error}"); bridge::log(&format!("status window FAILED: {error}")); return; }
         };
         let status_proxy = proxy.clone();
         let webview = match WebViewBuilder::new()
@@ -737,7 +738,7 @@ fn show_tablet_status(
             .build(&window)
         {
             Ok(view) => view,
-            Err(error) => { eprintln!("Could not create tablet status view: {error}"); return; }
+            Err(error) => { eprintln!("Could not create tablet status view: {error}"); bridge::log(&format!("status webview FAILED: {error}")); return; }
         };
         *window_slot = Some(window);
         *webview_slot = Some(webview);

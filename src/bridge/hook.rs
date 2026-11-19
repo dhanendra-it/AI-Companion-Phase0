@@ -57,6 +57,7 @@ unsafe fn run(shared: Arc<Shared>) {
     let hinst = GetModuleHandleW(PCWSTR::null()).map(HINSTANCE::from).unwrap_or_default();
     if let Err(e) = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), hinst, 0) {
         eprintln!("DeskBridge: could not install the keyboard hook: {e}");
+        super::log(&format!("keyboard hook FAILED: {e}"));
         shared.emit(super::Event::Refused(format!("DeskBridge shortcut unavailable: {e}")));
         return;
     }
@@ -65,6 +66,7 @@ unsafe fn run(shared: Arc<Shared>) {
         shared.emit(super::Event::Refused(format!("DeskBridge mouse hook unavailable: {e}")));
     }
     // Low-level hooks are called from this thread's message loop.
+    super::log("hooks installed, message loop running");
     let mut msg = MSG::default();
     while GetMessageW(&mut msg, HWND(std::ptr::null_mut()), 0, 0).0 > 0 {}
 }
@@ -122,6 +124,9 @@ fn key_event(w: WPARAM, l: LPARAM) -> bool {
     let msg = w.0 as u32;
     let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
     let tablet = sh.tablet.load(Ordering::Relaxed);
+    if k.vkCode == 0xA1 || k.vkCode == 0xA3 {
+        super::log(&format!("shortcut key vk={:#x} down={down} tablet={tablet}", k.vkCode)); // only the two shortcut keys
+    }
 
     let action = lock(keys).on_key(k.vkCode, k.scanCode, down, tablet, &mut to_text);
     match action {

@@ -47,6 +47,25 @@ pub enum Event {
     Link { connected: bool, message: String },
 }
 
+/// Diagnostic log at %LOCALAPPDATA%\Aalu\bridge.log (small, cleared when it grows past 256 KB).
+/// Only bridge events are written: hook/adb/connection steps and the two shortcut keys.
+/// Typed text and ordinary keys are never logged.
+pub fn log(msg: &str) {
+    use std::io::Write;
+    let Some(base) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("TEMP")) else { return };
+    let dir = std::path::PathBuf::from(base).join("Aalu");
+    let _ = std::fs::create_dir_all(&dir);
+    let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("bridge.log")) else { return };
+    if f.metadata().map(|m| m.len()).unwrap_or(0) > 262_144 {
+        let _ = f.set_len(0);
+    }
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let _ = writeln!(f, "[{ms}] {msg}");
+}
+
 pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -107,6 +126,7 @@ impl Shared {
         }
         *last = Some((connected, msg.to_string()));
         drop(last);
+        log(&format!("link connected={connected}: {msg}"));
         self.emit(Event::Link { connected, message: msg.to_string() });
     }
 
@@ -125,6 +145,11 @@ impl Shared {
     /// The shortcut. Called from the hook thread, which must never block: if another thread is
     /// in the middle of switching, this press is simply ignored.
     pub(crate) fn toggle(&self) {
+        log(&format!(
+            "shortcut pressed: tablet={} connected={}",
+            self.tablet.load(Ordering::SeqCst),
+            self.connected.load(Ordering::SeqCst)
+        ));
         let _g = match self.mode_lock.try_lock() {
             Ok(g) => g,
             Err(TryLockError::Poisoned(p)) => p.into_inner(),
@@ -173,6 +198,7 @@ fn short_reason(msg: &str) -> String {
 
 /// Starts the bridge. `notify` is called from bridge threads.
 pub fn start(notify: impl Fn(Event) + Send + Sync + 'static) {
+    log("bridge start");
     let (tx, rx) = sync_channel(1024);
     let shared = Arc::new(Shared::new(tx, Box::new(notify)));
     adb::spawn(shared.clone(), rx);
