@@ -100,7 +100,7 @@ const MOD_NOREPEAT: u32 = 0x4000;
 const VK_SPACE: u32 = 0x20;
 const VK_UP: u32 = 0x26;
 const VK_RCONTROL: i32 = 0xA3;
-const VK_XBUTTON1: i32 = 0x05;
+const VK_XBUTTON2: i32 = 0x06;
 
 #[link(name = "user32")]
 extern "system" {
@@ -210,12 +210,12 @@ fn main() -> wry::Result<()> {
 
     let (chat_hotkey_available, _scheduler_hotkey_available, _robot_hotkey_available) = register_global_hotkeys();
 
-    // Mouse Button 4 (XBUTTON1) toggles the Personal Toolbar.
+    // Mouse Button 4 (XBUTTON2) toggles the Personal Toolbar.
     let toolbar_mouse_proxy = proxy.clone();
     let _toolbar_mouse_thread = std::thread::spawn(move || {
         let mut was_down = false;
         loop {
-            let down = unsafe { GetAsyncKeyState(VK_XBUTTON1) as u16 & 0x8000 != 0 };
+            let down = unsafe { GetAsyncKeyState(VK_XBUTTON2) as u16 & 0x8000 != 0 };
             if down && !was_down { let _ = toolbar_mouse_proxy.send_event(AppEvent::ToggleToolbar); }
             was_down = down;
             std::thread::sleep(std::time::Duration::from_millis(35));
