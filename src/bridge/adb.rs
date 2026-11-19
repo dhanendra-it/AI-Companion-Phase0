@@ -22,6 +22,12 @@ type AdbPath = Arc<Mutex<Option<PathBuf>>>;
 pub(crate) fn spawn(sh: Arc<Shared>, rx: Receiver<Out>) {
     let adb: AdbPath = Arc::new(Mutex::new(None));
     {
+        let (ime_tx, ime_rx) = mpsc::channel();
+        sh.set_ime_queue(ime_tx);
+        let (sh, adb) = (sh.clone(), adb.clone());
+        let _ = thread::Builder::new().name("deskbridge-ime".into()).spawn(move || ime_worker(sh, adb, ime_rx));
+    }
+    {
         let sh = sh.clone();
         let _ = thread::Builder::new().name("deskbridge-writer".into()).spawn(move || writer_loop(sh, rx));
     }
@@ -171,6 +177,81 @@ fn first_line(texts: &[&str]) -> String {
         .to_string()
 }
 
+// ------------------------------------------------------------------ keyboard switching
+
+/// The DeskBridge keyboard on the tablet (package/.service).
+const DESK_IME: &str = "com.deskbridge.keyboard/.DeskBridgeIME";
+
+pub(crate) enum ImeCmd {
+    /// Tablet mode started: remember the current keyboard and select DeskBridge's.
+    Enter,
+    /// Tablet mode ended: put the remembered keyboard back.
+    Leave,
+}
+
+/// Input method ids come from the tablet and are passed to its shell, so only plain id characters are accepted.
+fn ime_id_ok(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 200
+        && id.contains('/')
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '/' | '$' | '-'))
+}
+
+/// Keyboard to go back to when the tablet had no usable one remembered (e.g. DeskBridge was left
+/// selected): the first installed keyboard that is not DeskBridge and not a voice-typing service.
+fn pick_fallback(ime_list: &str) -> Option<String> {
+    ime_list
+        .lines()
+        .map(str::trim)
+        .find(|id| ime_id_ok(id) && !id.starts_with("com.deskbridge.") && !id.to_lowercase().contains("voice"))
+        .map(String::from)
+}
+
+fn adb_shell(path: &Path, serial: &str, args: &[&str]) -> Option<String> {
+    let mut a = vec!["-s", serial, "shell"];
+    a.extend_from_slice(args);
+    match run_adb(path, &a, Duration::from_secs(6)) {
+        Ok(r) if r.ok => Some(r.out.trim().to_string()),
+        Ok(r) => {
+            super::log(&format!("adb shell {} failed: {}", args.join(" "), first_line(&[&r.err, &r.out])));
+            None
+        }
+        Err(e) => {
+            super::log(&format!("adb shell {} failed: {e}", args.join(" ")));
+            None
+        }
+    }
+}
+
+/// One thread runs the jobs in order, so a quick on/off can never swap the keyboard back and forth
+/// out of order. adb is slow (a few hundred ms) and must never run on the keyboard hook thread.
+fn ime_worker(sh: Arc<Shared>, adb: AdbPath, rx: Receiver<ImeCmd>) {
+    let mut previous: Option<String> = None;
+    for cmd in rx {
+        let (Some(path), Some(serial)) = (lock(&adb).clone(), lock(&sh.serial).clone()) else {
+            super::log("keyboard switch skipped: no adb or no tablet");
+            continue;
+        };
+        match cmd {
+            ImeCmd::Enter => {
+                let current = adb_shell(&path, &serial, &["settings", "get", "secure", "default_input_method"])
+                    .filter(|c| c != "null" && ime_id_ok(c) && c != DESK_IME);
+                previous = current.or_else(|| {
+                    adb_shell(&path, &serial, &["ime", "list", "-s"]).and_then(|l| pick_fallback(&l))
+                });
+                super::log(&format!("keyboard: switching to DeskBridge, will restore {previous:?}"));
+                adb_shell(&path, &serial, &["ime", "set", DESK_IME]);
+            }
+            ImeCmd::Leave => {
+                if let Some(p) = previous.take() {
+                    super::log(&format!("keyboard: restoring {p}"));
+                    adb_shell(&path, &serial, &["ime", "set", &p]);
+                }
+            }
+        }
+    }
+}
+
 // ------------------------------------------------------------------ link state machine
 
 struct Linker {
@@ -197,6 +278,7 @@ impl Linker {
     fn fail(&mut self, msg: &str) {
         self.sh.teardown();
         self.serial = None;
+        *lock(&self.sh.serial) = None;
         self.sh.link(false, msg);
     }
 
@@ -243,6 +325,7 @@ impl Linker {
             self.fail("Unexpected device id from adb.");
             return secs(10);
         }
+        *lock(&self.sh.serial) = Some(d.serial.clone());
         if d.state == "unauthorized" {
             self.fail("Unlock the tablet and tap 'Allow' on the USB debugging prompt (tick 'Always allow from this computer').");
             return secs(20);
@@ -413,6 +496,27 @@ mod tests {
         assert_eq!(d[1].state, "unauthorized");
         assert_eq!(d[1].model, None);
         assert!(parse_devices("List of devices attached\n\n").is_empty());
+    }
+
+    #[test]
+    fn keyboard_fallback_skips_deskbridge_and_voice_input() {
+        let list = "com.deskbridge.keyboard/.DeskBridgeIME\ncom.google.android.tts/com.google.android.apps.speech.tts.googletts.settings.asr.voiceime.VoiceInputMethodService\ncom.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME\n";
+        assert_eq!(
+            pick_fallback(list).as_deref(),
+            Some("com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME")
+        );
+        assert_eq!(pick_fallback("com.deskbridge.keyboard/.DeskBridgeIME\n"), None);
+        assert_eq!(pick_fallback(""), None);
+    }
+
+    #[test]
+    fn keyboard_ids_are_checked_before_reaching_the_tablet_shell() {
+        assert!(ime_id_ok(DESK_IME));
+        assert!(ime_id_ok("com.a.b/com.a.b.Inner$Service"));
+        assert!(!ime_id_ok("null"));
+        assert!(!ime_id_ok("a/b; reboot"));
+        assert!(!ime_id_ok("a/b c"));
+        assert!(!ime_id_ok(""));
     }
 
     #[test]

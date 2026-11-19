@@ -84,6 +84,10 @@ pub(crate) struct Shared {
     last_link: Mutex<Option<(bool, String)>>,
     mode_lock: Mutex<()>,
     wake: (Mutex<bool>, Condvar),
+    /// adb serial of the connected tablet (set by the link thread, used by the keyboard switcher).
+    pub(crate) serial: Mutex<Option<String>>,
+    /// Queue of "switch the tablet keyboard" jobs; set up in adb::spawn.
+    ime_tx: Mutex<Option<std::sync::mpsc::Sender<adb::ImeCmd>>>,
 }
 
 impl Shared {
@@ -99,6 +103,19 @@ impl Shared {
             last_link: Mutex::new(None),
             mode_lock: Mutex::new(()),
             wake: (Mutex::new(false), Condvar::new()),
+            serial: Mutex::new(None),
+            ime_tx: Mutex::new(None),
+        }
+    }
+
+    pub(crate) fn set_ime_queue(&self, tx: std::sync::mpsc::Sender<adb::ImeCmd>) {
+        *lock(&self.ime_tx) = Some(tx);
+    }
+
+    /// Never blocks (the hook thread calls this): the adb work happens on its own thread.
+    fn ime(&self, cmd: adb::ImeCmd) {
+        if let Some(tx) = lock(&self.ime_tx).as_ref() {
+            let _ = tx.send(cmd);
         }
     }
 
@@ -178,9 +195,11 @@ impl Shared {
         if on {
             hook::enter(); // park the cursor, learn Caps Lock
             self.tablet.store(true, Ordering::SeqCst);
+            self.ime(adb::ImeCmd::Enter); // tablet: switch to the DeskBridge keyboard
         } else {
             self.tablet.store(false, Ordering::SeqCst);
             hook::leave(); // release buttons on the tablet, put the cursor back
+            self.ime(adb::ImeCmd::Leave); // tablet: back to the keyboard it had before
         }
         self.emit(Event::Mode(on));
     }
