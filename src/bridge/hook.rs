@@ -24,7 +24,7 @@ use windows::{
         Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
         UI::{
-            Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyState, GetKeyboardLayout, ToUnicodeEx},
+            Input::KeyboardAndMouse::{GetKeyState, GetKeyboardLayout, ToUnicodeEx},
             WindowsAndMessaging::{
                 CallNextHookEx, GetCursorPos, GetForegroundWindow, GetMessageW, GetSystemMetrics,
                 GetWindowThreadProcessId, SetCursorPos, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT,
@@ -123,7 +123,7 @@ fn key_event(w: WPARAM, l: LPARAM) -> bool {
     let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
     let tablet = sh.tablet.load(Ordering::Relaxed);
 
-    let action = lock(keys).on_key(k.vkCode, k.scanCode, down, tablet, &mut to_text, &physically_down);
+    let action = lock(keys).on_key(k.vkCode, k.scanCode, down, tablet, &mut to_text);
     match action {
         KeyAction::Pass => false,
         KeyAction::Swallow => true,
@@ -136,10 +136,6 @@ fn key_event(w: WPARAM, l: LPARAM) -> bool {
             true
         }
     }
-}
-
-fn physically_down(vk: u32) -> bool {
-    unsafe { GetAsyncKeyState(vk as i32) as u16 & 0x8000 != 0 }
 }
 
 /// The characters a key types with the layout of the window that has focus.

@@ -58,7 +58,6 @@ svg {
 /* DeskBridge: small pill under the robot. "Tablet" stays while keyboard+mouse are on the tablet. */
 #tabletBadge{display:none;position:absolute;bottom:2px;right:calc(155px / 2);transform:translateX(50%);padding:4px 11px;border-radius:999px;background:#0e7a5f;border:1px solid #2fd6a6;color:#fff;font:600 11px system-ui;white-space:nowrap;box-shadow:0 3px 12px #0006;z-index:49;pointer-events:none}
 #tabletBadge.visible{display:block}
-#tabletBadge.notice{background:#7a5a0e;border-color:#e3b341;max-width:150px;white-space:normal;text-align:center}
 
 /* ==================== REMINDER STRIP ==================== */
 #reminderStrip{
@@ -848,22 +847,14 @@ callAction.addEventListener("click", event => { event.stopPropagation(); sendToA
 
 // DeskBridge (called from Rust): keyboard + mouse are on the tablet / the shortcut was refused.
 const tabletBadge = document.getElementById("tabletBadge");
-let tabletOn = false, tabletNoticeTimer = null;
+let tabletOn = false;
 function showTabletBadge() {
   tabletBadge.className = tabletOn ? "visible" : "";
   tabletBadge.textContent = tabletOn ? "Tablet  •  Ctrl+Shift" : "";
 }
 window.__setTabletMode = on => {
   tabletOn = !!on;
-  if (tabletNoticeTimer) { clearTimeout(tabletNoticeTimer); tabletNoticeTimer = null; }
   showTabletBadge();
-};
-window.__tabletNotice = text => {
-  if (tabletOn) return;
-  tabletBadge.textContent = String(text || "Tablet not connected.");
-  tabletBadge.className = "visible notice";
-  if (tabletNoticeTimer) clearTimeout(tabletNoticeTimer);
-  tabletNoticeTimer = setTimeout(() => { tabletNoticeTimer = null; showTabletBadge(); }, 6000);
 };
 sendToApp("bridge-ready");
 

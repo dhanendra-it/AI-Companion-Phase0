@@ -40,6 +40,7 @@ use wry::{PermissionKind, PermissionResponse, WebView, WebViewBuilder, WebViewBu
 const ROBOT_HTML: &str = include_str!("../assets/robot.html");
 const CHAT_HTML: &str = include_str!("../assets/chat.html");
 const SCHEDULER_HTML: &str = include_str!("../assets/scheduler.html");
+const TABLET_STATUS_HTML: &str = include_str!("../assets/tablet-status.html");
 
 const ROBOT_WIDTH: f64 = 155.0;
 const ROBOT_HEIGHT: f64 = 195.0;
@@ -49,6 +50,8 @@ const CHAT_HEIGHT: f64 = 560.0;
 const CHAT_GAP: f64 = 8.0;
 const SCHEDULER_WIDTH: f64 = 580.0;
 const SCHEDULER_HEIGHT: f64 = 480.0;
+const TABLET_STATUS_WIDTH: f64 = 310.0;
+const TABLET_STATUS_HEIGHT: f64 = 176.0;
 const REMINDER_EXPAND_W: f64 = 145.0;
 const REMINDER_EXPAND_H: f64 = 70.0;
 
@@ -62,6 +65,8 @@ enum AppEvent {
     Reminder(Vec<String>),
     SchedulerMessage(String),
     Bridge(bridge::Event),
+    TabletStatusMessage(String),
+    HideTabletStatus(u64),
 }
 
 #[repr(C)]
@@ -279,6 +284,8 @@ fn main() -> wry::Result<()> {
     robot_window.set_visible(true);
     let mut chat_window: Option<Window> = None;
     let mut chat_webview: Option<WebView> = None;
+    let mut tablet_status_window: Option<Window> = None;
+    let mut tablet_status_webview: Option<WebView> = None;
 
     let root_id = robot_window.id();
     let mut chat_ready = false;
@@ -294,7 +301,9 @@ fn main() -> wry::Result<()> {
 
     let mut is_reminder_active = false;
     let mut bridge_tablet_mode = false;
-    let mut bridge_status: Option<String> = None;
+    let mut bridge_connected = false;
+    let mut bridge_status = "Waiting for tablet".to_string();
+    let mut tablet_status_generation = 0u64;
     let mut scheduler_window: Option<Window> = None;
     let mut scheduler_webview: Option<WebView> = None;
 
@@ -346,10 +355,6 @@ fn main() -> wry::Result<()> {
             Event::UserEvent(AppEvent::RobotMessage(message)) => {
                 if message == "bridge-ready" {
                     let _ = robot_webview.evaluate_script(&format!("window.__setTabletMode && window.__setTabletMode({bridge_tablet_mode})"));
-                    if let Some(status) = bridge_status.as_ref() {
-                        let text = serde_json::to_string(status).unwrap_or_default();
-                        let _ = robot_webview.evaluate_script(&format!("window.__tabletNotice && window.__tabletNotice({text})"));
-                    }
                 } else if message == "open-chat" {
                     open_chat(
                         target,
@@ -540,29 +545,60 @@ fn main() -> wry::Result<()> {
             }
 
             Event::UserEvent(AppEvent::Bridge(event)) => {
-                let js = match event {
+                match event {
                     bridge::Event::Mode(on) => {
                         bridge_tablet_mode = on;
-                        format!("window.__setTabletMode && window.__setTabletMode({on})")
+                        let _ = robot_webview.evaluate_script(&format!("window.__setTabletMode && window.__setTabletMode({on})"));
+                        tablet_status_generation = tablet_status_generation.wrapping_add(1);
+                        show_tablet_status(
+                            target, &robot_window, &proxy,
+                            &mut tablet_status_window, &mut tablet_status_webview,
+                            bridge_connected, bridge_tablet_mode, &bridge_status,
+                        );
+                        if !on {
+                            schedule_tablet_status_hide(&proxy, &mut tablet_status_generation, 3500);
+                        }
                     }
                     bridge::Event::Refused(why) => {
-                        bridge_status = Some(why.clone());
-                        let text = serde_json::to_string(&why).unwrap_or_else(|_| "\"\"".into());
-                        format!("window.__tabletNotice && window.__tabletNotice({text})")
+                        bridge_status = why;
+                        show_tablet_status(
+                            target, &robot_window, &proxy,
+                            &mut tablet_status_window, &mut tablet_status_webview,
+                            bridge_connected, bridge_tablet_mode, &bridge_status,
+                        );
+                        schedule_tablet_status_hide(&proxy, &mut tablet_status_generation, 5000);
                     }
                     bridge::Event::Link { connected, message } => {
-                        let text = if connected {
-                            "Tablet ready - press Right Ctrl + Right Shift".to_string()
-                        } else {
-                            message
-                        };
-                        bridge_status = Some(text.clone());
-                        let text = serde_json::to_string(&text).unwrap_or_else(|_| "\"Tablet status unavailable.\"".into());
-                        format!("window.__tabletNotice && window.__tabletNotice({text})")
+                        let was_connected = bridge_connected;
+                        bridge_connected = connected;
+                        bridge_status = if connected { "USB tablet connected".into() } else { message };
+                        if tablet_status_window.is_some() && tablet_status_window.as_ref().is_some_and(Window::is_visible) {
+                            update_tablet_status(&mut tablet_status_webview, connected, bridge_tablet_mode, &bridge_status);
+                        } else if was_connected && !connected {
+                            show_tablet_status(
+                                target, &robot_window, &proxy,
+                                &mut tablet_status_window, &mut tablet_status_webview,
+                                bridge_connected, bridge_tablet_mode, &bridge_status,
+                            );
+                            schedule_tablet_status_hide(&proxy, &mut tablet_status_generation, 5000);
+                        }
                     }
-                };
-                if !js.is_empty() {
-                    let _ = robot_webview.evaluate_script(&js);
+                }
+            }
+
+            Event::UserEvent(AppEvent::TabletStatusMessage(raw)) => {
+                let ipc: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
+                if ipc["t"] == "ready" {
+                    update_tablet_status(&mut tablet_status_webview, bridge_connected, bridge_tablet_mode, &bridge_status);
+                } else if ipc["t"] == "close" {
+                    tablet_status_generation = tablet_status_generation.wrapping_add(1);
+                    if let Some(window) = tablet_status_window.as_ref() { window.set_visible(false); }
+                }
+            }
+
+            Event::UserEvent(AppEvent::HideTabletStatus(generation)) => {
+                if generation == tablet_status_generation && !bridge_tablet_mode {
+                    if let Some(window) = tablet_status_window.as_ref() { window.set_visible(false); }
                 }
             }
 
@@ -609,6 +645,11 @@ fn main() -> wry::Result<()> {
                         is_reminder_active,
                     ));
                 }
+                if let Some(window) = tablet_status_window.as_ref() {
+                    if window.is_visible() {
+                        window.set_outer_position(aligned_window_position(target, &robot_window, TABLET_STATUS_WIDTH, TABLET_STATUS_HEIGHT, is_reminder_active));
+                    }
+                }
             }
             Event::WindowEvent {
                 window_id,
@@ -628,6 +669,8 @@ fn main() -> wry::Result<()> {
                 } else if scheduler_window.as_ref().map(Window::id) == Some(window_id) {
                     scheduler_webview = None;
                     scheduler_window = None;
+                } else if tablet_status_window.as_ref().map(Window::id) == Some(window_id) {
+                    if let Some(window) = tablet_status_window.as_ref() { window.set_visible(false); }
                 }
             }
 
@@ -657,6 +700,71 @@ fn shrink_robot_window(window: &Window) {
         window.set_inner_size(LogicalSize::new(ROBOT_WIDTH, ROBOT_HEIGHT));
         window.set_outer_position(PhysicalPosition::new(pos.x + dx, pos.y + dy));
     }
+}
+
+fn show_tablet_status(
+    target: &EventLoopWindowTarget<AppEvent>,
+    robot_window: &Window,
+    proxy: &EventLoopProxy<AppEvent>,
+    window_slot: &mut Option<Window>,
+    webview_slot: &mut Option<WebView>,
+    connected: bool,
+    tablet_mode: bool,
+    message: &str,
+) {
+    if window_slot.is_none() {
+        let window = match WindowBuilder::new()
+            .with_title("Aalu Tablet Status")
+            .with_inner_size(LogicalSize::new(TABLET_STATUS_WIDTH, TABLET_STATUS_HEIGHT))
+            .with_position(aligned_window_position(target, robot_window, TABLET_STATUS_WIDTH, TABLET_STATUS_HEIGHT, false))
+            .with_decorations(false)
+            .with_resizable(false)
+            .with_always_on_top(true)
+            .with_skip_taskbar(true)
+            .with_content_protection(true)
+            .with_visible(false)
+            .build(target)
+        {
+            Ok(window) => window,
+            Err(error) => { eprintln!("Could not create tablet status window: {error}"); return; }
+        };
+        let status_proxy = proxy.clone();
+        let webview = match WebViewBuilder::new()
+            .with_html(TABLET_STATUS_HTML)
+            .with_ipc_handler(move |request| {
+                let _ = status_proxy.send_event(AppEvent::TabletStatusMessage(request.body().clone()));
+            })
+            .build(&window)
+        {
+            Ok(view) => view,
+            Err(error) => { eprintln!("Could not create tablet status view: {error}"); return; }
+        };
+        *window_slot = Some(window);
+        *webview_slot = Some(webview);
+    }
+
+    if let Some(window) = window_slot.as_ref() {
+        window.set_outer_position(aligned_window_position(target, robot_window, TABLET_STATUS_WIDTH, TABLET_STATUS_HEIGHT, false));
+        window.set_visible(true);
+    }
+    update_tablet_status(webview_slot, connected, tablet_mode, message);
+}
+
+fn update_tablet_status(webview_slot: &mut Option<WebView>, connected: bool, tablet_mode: bool, message: &str) {
+    let message = serde_json::to_string(message).unwrap_or_else(|_| "\"Tablet status unavailable\"".into());
+    if let Some(view) = webview_slot.as_ref() {
+        let _ = view.evaluate_script(&format!("window.__tabletStatus && window.__tabletStatus({connected}, {tablet_mode}, {message})"));
+    }
+}
+
+fn schedule_tablet_status_hide(proxy: &EventLoopProxy<AppEvent>, generation: &mut u64, delay_ms: u64) {
+    *generation = generation.wrapping_add(1);
+    let generation = *generation;
+    let proxy = proxy.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        let _ = proxy.send_event(AppEvent::HideTabletStatus(generation));
+    });
 }
 
 fn toggle_chat(

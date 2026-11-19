@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111a22;color:#eaf2f7;font:13px "Segoe UI",system-ui,sans-serif}
+body{padding:15px 16px;border:1px solid #344653;border-radius:13px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.title{font-size:12px;font-weight:700;letter-spacing:.09em;color:#58d5c0}
+button{border:0;background:transparent;color:#91a2ae;font:20px/20px "Segoe UI",sans-serif;cursor:pointer;padding:0 3px}
+.status{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:650;margin-bottom:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#f0b64a;box-shadow:0 0 10px #f0b64a55}.dot.on{background:#44d3ad;box-shadow:0 0 10px #44d3ad88}
+.routes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px}
+.route{background:#1a2731;border:1px solid #2c3c48;border-radius:8px;padding:8px 9px;color:#aab8c2;font-size:11px}
+.route strong{display:block;color:#f2f6f8;font-size:12px;margin-top:3px}
+.message{color:#91a2ae;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+footer{position:absolute;bottom:9px;right:16px;color:#748591;font-size:10px}
+</style>
+</head>
+<body>
+<header><div class="title">TABLET BRIDGE</div><button aria-label="Close" onclick="window.ipc.postMessage(JSON.stringify({t:'close'}))">×</button></header>
+<div class="status"><span class="dot" id="dot"></span><span id="connection">Checking tablet…</span></div>
+<div class="routes">
+  <div class="route">KEYBOARD<strong id="keyboard">Laptop</strong></div>
+  <div class="route">MOUSE<strong id="mouse">Laptop</strong></div>
+</div>
+<div class="message" id="message">Waiting for USB tablet</div>
+<footer>Right Ctrl + Right Shift to switch</footer>
+<script>
+window.ipc?.postMessage(JSON.stringify({t:'ready'}));
+window.__tabletStatus=(connected,active,message)=>{
+  document.getElementById('dot').classList.toggle('on',!!connected);
+  document.getElementById('connection').textContent=connected?'Tablet connected':'Tablet not connected';
+  document.getElementById('keyboard').textContent=active?'Tablet':'Laptop';
+  document.getElementById('mouse').textContent=active?'Tablet':'Laptop';
+  document.getElementById('message').textContent=message|| (connected?'USB link ready':'Check USB cable and tablet app');
+};
+</script>
+</body>
+</html>

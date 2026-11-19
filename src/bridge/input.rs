@@ -79,8 +79,8 @@ impl KeyTracker {
     }
 
     /// `to_text(vk, scan, shift, caps)` turns a key into typed characters using the active layout.
-    /// `phys_down(vk)` asks Windows whether a key is really down; it protects against a missed
-    /// key-up (lock screen, sleep) leaving the chord permanently "held".
+    /// Key-up events from the low-level hook reset chord state. Do not query GetAsyncKeyState:
+    /// tablet-mode key downs are swallowed, so Windows may report a held chord key as up.
     pub fn on_key(
         &mut self,
         vk: u32,
@@ -88,7 +88,6 @@ impl KeyTracker {
         down: bool,
         tablet: bool,
         to_text: &mut dyn FnMut(u32, u32, bool, bool) -> Option<String>,
-        phys_down: &dyn Fn(u32) -> bool,
     ) -> KeyAction {
         if vk > 255 {
             return KeyAction::Pass;
@@ -100,7 +99,7 @@ impl KeyTracker {
             if self.hotkey_keys[i] {
                 return KeyAction::Swallow; // auto-repeat of a chord key
             }
-            if self.hotkey_matches(vk, phys_down) {
+            if self.hotkey_matches(vk) {
                 self.hotkey_keys[i] = true;
                 self.swallowed_ups[i] = true;
                 return KeyAction::Toggle;
@@ -134,7 +133,7 @@ impl KeyTracker {
         }
     }
 
-    fn hotkey_matches(&mut self, vk: u32, phys_down: &dyn Fn(u32) -> bool) -> bool {
+    fn hotkey_matches(&mut self, vk: u32) -> bool {
         if self.hotkey.is_empty() || !self.hotkey.contains(&vk) {
             return false;
         }
@@ -143,10 +142,6 @@ impl KeyTracker {
                 continue;
             }
             if !self.held[k as usize] {
-                return false;
-            }
-            if !phys_down(k) {
-                self.held[k as usize] = false; // stale: the key-up was missed
                 return false;
             }
         }
@@ -296,7 +291,7 @@ mod tests {
                 None
             }
         };
-        t.on_key(vk, 0, down, tablet, &mut to_text, &|_| true)
+        t.on_key(vk, 0, down, tablet, &mut to_text)
     }
 
     #[test]
@@ -317,6 +312,14 @@ mod tests {
     }
 
     #[test]
+    fn chord_returns_from_tablet_mode_even_when_swallowed_ctrl_is_not_visible_to_windows() {
+        let mut t = KeyTracker::new(&DEFAULT_HOTKEY);
+        let mut none = |_: u32, _: u32, _: bool, _: bool| None;
+        assert_eq!(t.on_key(RCTRL, 0, true, true, &mut none), KeyAction::Swallow);
+        assert_eq!(t.on_key(RSHIFT, 0, true, true, &mut none), KeyAction::Toggle);
+    }
+
+    #[test]
     fn chord_works_again_from_tablet_mode() {
         let mut t = tracker();
         assert_eq!(key(&mut t, RCTRL, true, true), KeyAction::Swallow);
@@ -326,13 +329,11 @@ mod tests {
     }
 
     #[test]
-    fn a_stale_held_key_does_not_trigger_the_chord() {
+    fn key_up_resets_partial_chord_state() {
         let mut t = tracker();
-        key(&mut t, RCTRL, true, false);
-        let mut none = |_: u32, _: u32, _: bool, _: bool| None;
-        // Windows says Right Ctrl is not really down any more (missed key-up)
-        let a = t.on_key(RSHIFT, 0, true, false, &mut none, &|vk| vk != RCTRL);
-        assert_eq!(a, KeyAction::Pass);
+        assert_eq!(key(&mut t, RCTRL, true, false), KeyAction::Pass);
+        assert_eq!(key(&mut t, RCTRL, false, false), KeyAction::Pass);
+        assert_eq!(key(&mut t, RSHIFT, true, false), KeyAction::Pass);
     }
 
     #[test]
