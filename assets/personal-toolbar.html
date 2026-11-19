@@ -4,51 +4,90 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aalu Personal Toolbar</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,"Segoe UI",sans-serif;background:#11131a;color:#eef0f6}
-*{box-sizing:border-box}body{margin:0;padding:18px;background:radial-gradient(ellipse at top left,#252b3b,#11131a 62%);min-height:100vh}
-.shell{max-width:760px;margin:auto;border:1px solid #343a4b;border-radius:22px;background:#171a23eF;box-shadow:0 24px 70px #0008;overflow:hidden}
-header{display:flex;align-items:center;justify-content:space-between;padding:17px 20px;border-bottom:1px solid #303544}
-.brand{display:flex;gap:12px;align-items:center}.orb{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#6ce0d0,#6878ff);display:grid;place-items:center;color:#111;font-weight:900}
-h1{font-size:16px;margin:0}small{color:#8f98ad}.close{border:0;background:#252a36;color:#aeb6c8;border-radius:9px;padding:7px 11px;cursor:pointer}
-.tabs{display:flex;gap:7px;padding:13px 16px;overflow:auto;border-bottom:1px solid #303544}
-.tab{white-space:nowrap;border:1px solid transparent;background:transparent;color:#9da6bb;padding:8px 12px;border-radius:10px;cursor:pointer}.tab.active{background:#293044;color:#fff;border-color:#48516b}
-main{padding:17px}.toolbar{display:flex;gap:8px;margin-bottom:14px}.toolbar input,.modal input,.modal select{background:#10131b;border:1px solid #363d50;color:#fff;padding:10px 12px;border-radius:10px;min-width:0;flex:1;outline:none}
-button.primary{background:#7c8cff;color:#101321;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px}
-.item{position:relative;border:1px solid #303748;border-radius:14px;padding:13px;background:linear-gradient(145deg,#202635,#191e29);min-height:90px;cursor:pointer}
-.item:hover{border-color:#7585ff;transform:translateY(-1px)}.item .ico{font-size:21px}.item strong{display:block;margin-top:9px;font-size:13px}.item small{display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.del{position:absolute;right:8px;top:7px;border:0;background:transparent;color:#7f899f;cursor:pointer;font-size:16px}
-.empty{text-align:center;padding:42px 15px;color:#8f98ad;border:1px dashed #394155;border-radius:14px}
-.modal{display:none;position:fixed;inset:0;background:#0009;align-items:center;justify-content:center;padding:18px}.modal.open{display:flex}.dialog{width:min(420px,100%);background:#1b202c;border:1px solid #41495d;border-radius:17px;padding:18px;display:grid;gap:10px}.dialog h2{margin:0 0 4px;font-size:16px}.dialog .actions{display:flex;justify-content:flex-end;gap:8px}.secondary{background:#2b3242;color:#dce1ed;border:0;border-radius:10px;padding:10px 13px;cursor:pointer}
-footer{padding:0 19px 16px;color:#778198;font-size:11px}
+:root{font-family:Inter,"Segoe UI",sans-serif;color:#f1f2f6}
+*{box-sizing:border-box;user-select:none}
+html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+.panel{position:relative;width:100vw;height:100vh;border-radius:64px;background:rgba(38,38,42,.78);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 18px 50px rgba(0,0,0,.45);overflow:hidden}
+.center{position:absolute;left:50%;top:50%;width:39%;height:39%;transform:translate(-50%,-50%);border-radius:38px;background:rgba(18,18,20,.55);display:grid;place-items:center;text-align:center;font-size:14px;font-weight:600;cursor:pointer;padding:10px}
+.center small{display:block;margin-top:6px;font-size:11px;font-weight:500;color:#9a9eaa}
+.slot{position:absolute;width:98px;transform:translate(-50%,-50%);text-align:center;cursor:pointer}
+.slot:hover .ico{transform:scale(1.1);background:rgba(255,255,255,.1)}
+.ico{position:relative;width:48px;height:48px;margin:0 auto;border-radius:14px;display:grid;place-items:center;transition:transform .12s,background .12s;font-size:22px}
+.ico svg{width:34px;height:34px;fill:none;stroke:#ecedf2;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ico .chev{position:absolute;right:-4px;bottom:2px;font-size:12px;color:#b9bcc7}
+.badge{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:19px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px rgba(0,0,0,.35)}
+.lbl{margin-top:6px;font-size:11.5px;font-weight:600;color:#e7e8ee;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.add .ico{border:1.5px dashed rgba(255,255,255,.28);font-size:24px;color:#c4c7d2}
+.modal{display:none;position:absolute;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:24px;z-index:5}.modal.open{display:flex}
+.dialog{width:100%;background:#1d1f27;border:1px solid #43485a;border-radius:20px;padding:18px;display:grid;gap:10px}.dialog h2{margin:0 0 2px;font-size:15px}
+.dialog input,.dialog select{background:#10121a;border:1px solid #393f52;color:#fff;padding:9px 11px;border-radius:10px;outline:none;font-size:13px;user-select:text}
+.actions{display:flex;justify-content:flex-end;gap:8px}.actions button{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700}
+.primary{background:#7c8cff;color:#101321}.secondary{background:#2b3242;color:#dce1ed}
 </style>
 </head>
 <body>
-<div class="shell">
-<header><div class="brand"><div class="orb">A</div><div><h1>Personal Toolbar</h1><small>Your workspace, one tap away</small></div></div><button class="close" id="close">✕</button></header>
-<nav class="tabs" id="tabs"></nav>
-<main><div class="toolbar"><input id="search" placeholder="Search this section…"><button class="primary" id="add">＋ Add</button></div><section class="grid" id="items"></section></main>
-<footer>Saved on this PC · Your shortcuts and layout stay local to this device</footer>
+<div class="panel" id="panel">
+  <div class="center" id="center"></div>
+  <div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle">Add item</h2><input id="name" placeholder="Name"><input id="target" placeholder="URL, app path, or text"><select id="kind"><option value="url">Website / URL</option><option value="app">Desktop app / folder path</option><option value="text">Text (copy to clipboard)</option></select><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Save</button></div></div></div>
 </div>
-<div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle">Add item</h2><input id="name" placeholder="Name"><input id="target" placeholder="URL, app path, or command"><select id="kind"><option value="url">Website / URL</option><option value="app">Desktop app path</option><option value="text">Command (save only)</option></select><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Save item</button></div></div></div>
 <script>
-const sections=["Shortcuts","Commands","Folders","Bookmarks","Window Manager","Aalu"];
-const icons={"Shortcuts":"↗","Commands":"⌘","Folders":"▣","Bookmarks":"★","Window Manager":"▱","Aalu":"✦"};
-const key="aalu.personalToolbar.v1";let active="Shortcuts",data=load();
-function load(){try{return JSON.parse(localStorage.getItem(key)||"{}")}catch{return {}}}
+// Slot centres as % of the 500x500 panel, clockwise from top-left (matches the reference layout).
+const SLOTS=[[17,21],[43,15],[70,15],[85,37],[85,64],[70,85],[43,85],[17,79],[15,50]];
+const SVG={
+ Commands:'<path d="M4 24 10 8 16 24M6.4 18h7.2"/><path d="M21 7h5M23.5 7v18M21 25h5"/>',
+ Shortcuts:'<path d="M15 4l3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/><path d="M26 4v5M23.5 6.5h5"/>',
+ Folders:'<path d="M4 10a2 2 0 0 1 2-2h6l3 3h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
+ "Window Manager":'<rect x="5" y="5" width="9" height="9" rx="2"/><rect x="18" y="5" width="9" height="9" rx="2"/><rect x="5" y="18" width="9" height="9" rx="2"/><rect x="18" y="18" width="9" height="9" rx="2"/>',
+ Bookmarks:'<circle cx="16" cy="16" r="11"/><ellipse cx="16" cy="16" rx="5" ry="11"/><path d="M5 16h22M7 10h18M7 22h18"/>'
+};
+// Ring order: [section key, label]. "Apps" slots (4-7) are filled from the user's pinned apps.
+const TOP=[["Commands","Text Snippets"],["Shortcuts","Shortcuts"],["Folders","Folders"],["Window Manager","Window Manager"]];
+const BOOKMARKS=["Bookmarks","Bookmarks"];
+const WM=[["▱","Show / hide Aalu","toggle-robot"],["◫","Open chat","open-chat"],["◷","Open scheduler","open-scheduler"]];
+const key="aalu.personalToolbar.v1";
+let data=load(),view=null,page=0; // view=null -> ring, else section key
+const panel=document.getElementById("panel"),center=document.getElementById("center");
+function load(){try{return JSON.parse(localStorage.getItem(key)||"{}")}catch{return{}}}
 function persist(){localStorage.setItem(key,JSON.stringify(data))}
-const tabs=document.getElementById("tabs"),items=document.getElementById("items"),search=document.getElementById("search");
-function renderTabs(){tabs.innerHTML="";sections.forEach(s=>{const b=document.createElement("button");b.className="tab"+(s===active?" active":"");b.textContent=icons[s]+"  "+s;b.onclick=()=>{active=s;render()};tabs.append(b)})}
-function render(){renderTabs();items.innerHTML="";let list=(data[active]||[]).filter(x=>(x.name+" "+x.target).toLowerCase().includes(search.value.toLowerCase()));
-if(active==="Window Manager"||active==="Aalu"){const defaults=active==="Window Manager"?[["▱","Show / hide Aalu","toggle-robot"],["◫","Open chat","open-chat"],["◷","Open scheduler","open-scheduler"]]:[["✦","Meet Aalu","toggle-robot"],["⚙","Open Aalu chat","open-chat"]];defaults.forEach(([ico,n,cmd])=>items.append(makeCard({name:n,target:cmd,kind:"action",icon:ico},false)))}
-list.forEach((x,i)=>items.append(makeCard(x,true,i)));
-if(!items.children.length){const e=document.createElement("div");e.className="empty";e.style.gridColumn="1/-1";e.textContent="Nothing here yet. Click ＋ Add to create your first item.";items.append(e)}}
-function makeCard(x,removable,index){const el=document.createElement("article");el.className="item";const ico=document.createElement("div");ico.className="ico";ico.textContent=x.icon||icons[active]||"•";const strong=document.createElement("strong");strong.textContent=x.name;const small=document.createElement("small");small.textContent=x.target||active;el.append(ico,strong,small);if(removable){const del=document.createElement("button");del.className="del";del.textContent="×";del.title="Delete";del.onclick=e=>{e.stopPropagation();data[active].splice(index,1);persist();render()};el.append(del)}el.onclick=()=>activate(x);return el}
-function activate(x){if(x.kind==="action"){window.ipc.postMessage(x.target);return}if(x.kind==="text"){navigator.clipboard?.writeText(x.target);return}if(x.kind==="app"){window.ipc.postMessage(JSON.stringify({t:"launch-app",target:x.target}));return}if(x.kind==="url"){let u=x.target;if(!/^https?:\/\//i.test(u))u="https://"+u;window.ipc.postMessage(JSON.stringify({t:"open-url",target:u}));}}
-document.getElementById("add").onclick=()=>{document.getElementById("modal").classList.add("open");document.getElementById("name").value="";document.getElementById("target").value="";document.getElementById("kind").value=active==="Commands"?"text":active==="Shortcuts"?"url":"text";document.getElementById("name").focus()};
+function hue(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h}
+function clear(){panel.querySelectorAll(".slot").forEach(e=>e.remove())}
+function slot(i,html,onclick,extra){const[x,y]=SLOTS[i];const d=document.createElement("div");d.className="slot"+(extra||"");d.style.left=x+"%";d.style.top=y+"%";d.innerHTML=html;d.onclick=onclick;panel.append(d);return d}
+function sectionSlot(i,k,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+SVG[k]+'</svg><span class="chev">›</span></div><div class="lbl">'+label+'</div>',()=>{view=k;page=0;render()})}
+function badge(x){const el=document.createElement("div");el.className="badge";if(x.icon){el.style.background="rgba(255,255,255,.1)";el.textContent=x.icon}else{const h=hue(x.name);el.style.background="linear-gradient(145deg,hsl("+h+" 70% 58%),hsl("+(h+40)+" 70% 38%))";el.textContent=(x.name[0]||"?").toUpperCase()}return el}
+function itemSlot(i,x,removable,idx,listKey){const d=slot(i,'<div class="ico"></div><div class="lbl"></div>',()=>activate(x));d.querySelector(".ico").append(badge(x));d.querySelector(".lbl").textContent=x.name;
+ if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){data[listKey].splice(idx,1);persist();render()}}}
+function addSlot(i,listKey,label){slot(i,'<div class="ico">＋</div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
+function render(){clear();
+ if(view===null){
+  center.innerHTML="Close<small>Esc or click</small>";
+  TOP.forEach(([k,l],n)=>sectionSlot(n,k,l));
+  sectionSlot(8,BOOKMARKS[0],BOOKMARKS[1]);
+  const apps=data.Apps||[];
+  for(let n=0;n<4;n++){const a=apps[n];if(a)itemSlot(4+n,a,true,n,"Apps");else if(n===apps.length)addSlot(4+n,"Apps","Add app")}
+ }else{
+  const list=(view==="Window Manager"?WM.map(([icon,name,target])=>({icon,name,target,kind:"action"})):[]).concat(data[view]||[]);
+  const per=8,pages=Math.max(1,Math.ceil((list.length+1)/per));
+  if(page>=pages)page=pages-1;
+  center.innerHTML=view+"<small>"+(pages>1?"Page "+(page+1)+"/"+pages+" · scroll · ":"")+"click to go back</small>";
+  const base=(view==="Window Manager"?WM.length:0);
+  const slice=list.slice(page*per,page*per+per);
+  slice.forEach((x,n)=>{const gi=page*per+n;itemSlot(n,x,x.kind!=="action",gi-base,view)});
+  if(slice.length<per)addSlot(slice.length,view,"Add");
+ }}
+function activate(x){
+ if(x.kind==="action"){window.ipc.postMessage(x.target);return}
+ if(x.kind==="text"){navigator.clipboard?.writeText(x.target);return}
+ if(x.kind==="app"){window.ipc.postMessage(JSON.stringify({t:"launch-app",target:x.target}));window.ipc.postMessage("close");return}
+ if(x.kind==="url"){let u=x.target;if(!/^https?:\/\//i.test(u))u="https://"+u;window.ipc.postMessage(JSON.stringify({t:"open-url",target:u}));window.ipc.postMessage("close")}}
+let addTo=null;
+function openModal(listKey){addTo=listKey;const k=document.getElementById("kind");document.getElementById("name").value="";document.getElementById("target").value="";
+ k.value=listKey==="Apps"||listKey==="Folders"?"app":listKey==="Commands"?"text":"url";document.getElementById("modal").classList.add("open");document.getElementById("name").focus()}
 document.getElementById("cancel").onclick=()=>document.getElementById("modal").classList.remove("open");
-document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),target=document.getElementById("target").value.trim(),kind=document.getElementById("kind").value;if(!name||!target)return;data[active]=data[active]||[];data[active].push({name,target,kind});persist();document.getElementById("modal").classList.remove("open");render()};
-document.getElementById("close").onclick=()=>window.ipc.postMessage("close");
-search.oninput=render;render();
+document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),target=document.getElementById("target").value.trim(),kind=document.getElementById("kind").value;if(!name||!target)return;data[addTo]=data[addTo]||[];data[addTo].push({name,target,kind});persist();document.getElementById("modal").classList.remove("open");render()};
+center.onclick=()=>{if(view===null)window.ipc.postMessage("close");else{view=null;render()}};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(document.getElementById("modal").classList.contains("open"))document.getElementById("modal").classList.remove("open");else if(view!==null){view=null;render()}else window.ipc.postMessage("close")}});
+document.addEventListener("wheel",e=>{if(view===null)return;page=Math.max(0,page+(e.deltaY>0?1:-1));render()},{passive:true});
+window.__reset=()=>{view=null;page=0;document.getElementById("modal").classList.remove("open");render()};
+render();
 </script>
 </body></html>

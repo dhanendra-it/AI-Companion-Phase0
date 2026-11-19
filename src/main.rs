@@ -53,8 +53,8 @@ const SCHEDULER_WIDTH: f64 = 580.0;
 const SCHEDULER_HEIGHT: f64 = 480.0;
 const TABLET_STATUS_WIDTH: f64 = 310.0;
 const TABLET_STATUS_HEIGHT: f64 = 176.0;
-const TOOLBAR_WIDTH: f64 = 760.0;
-const TOOLBAR_HEIGHT: f64 = 610.0;
+const TOOLBAR_WIDTH: f64 = 500.0;
+const TOOLBAR_HEIGHT: f64 = 500.0;
 const REMINDER_EXPAND_W: f64 = 145.0;
 const REMINDER_EXPAND_H: f64 = 70.0;
 
@@ -1125,6 +1125,10 @@ fn toggle_toolbar(
 ) {
     if let Some(window) = window_slot.as_ref() {
         let visible = window.is_visible();
+        if !visible {
+            if let Some(view) = webview_slot.as_ref() { let _ = view.evaluate_script("window.__reset&&window.__reset()"); }
+            center_toolbar(target, window);
+        }
         window.set_visible(!visible);
         if !visible { window.set_focus(); }
         return;
@@ -1133,23 +1137,42 @@ fn toggle_toolbar(
         .with_title("Aalu Personal Toolbar")
         .with_window_icon(app_icon::window_icon())
         .with_inner_size(LogicalSize::new(TOOLBAR_WIDTH, TOOLBAR_HEIGHT))
-        .with_min_inner_size(LogicalSize::new(520.0, 420.0))
         .with_always_on_top(true)
         .with_decorations(false)
-        .with_resizable(true)
+        .with_undecorated_shadow(false)
+        .with_transparent(true)
+        .with_skip_taskbar(true)
+        .with_resizable(false)
         .with_content_protection(true)
         .build(target)
     {
         Ok(window) => window,
         Err(error) => { eprintln!("Could not create Personal Toolbar window: {error}"); return; }
     };
+    center_toolbar(target, &window);
     let toolbar_proxy = proxy.clone();
     match WebViewBuilder::new()
         .with_html(PERSONAL_TOOLBAR_HTML)
+        .with_transparent(true)
         .with_ipc_handler(move |request| { let _ = toolbar_proxy.send_event(AppEvent::ToolbarMessage(request.body().clone())); })
         .build(&window)
     {
         Ok(view) => { *window_slot = Some(window); *webview_slot = Some(view); }
         Err(error) => eprintln!("Could not create Personal Toolbar WebView: {error}"),
+    }
+}
+
+// Centre the toolbar on the primary monitor (physical pixels, DPI-safe).
+fn center_toolbar(target: &EventLoopWindowTarget<AppEvent>, window: &Window) {
+    if let Some(monitor) = target.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let pos = monitor.position();
+        let size = monitor.size();
+        let w = (TOOLBAR_WIDTH * scale).round() as i32;
+        let h = (TOOLBAR_HEIGHT * scale).round() as i32;
+        window.set_outer_position(PhysicalPosition::new(
+            pos.x + (size.width as i32 - w) / 2,
+            pos.y + (size.height as i32 - h) / 2,
+        ));
     }
 }
