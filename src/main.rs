@@ -74,6 +74,7 @@ enum AppEvent {
     TabletStatusMessage(String),
     HideTabletStatus(u64),
     KeepOnTop,
+    ToolbarFocusCheck,
 }
 
 #[repr(C)]
@@ -115,6 +116,7 @@ extern "system" {
     fn UnregisterHotKey(hwnd: *mut c_void, id: i32) -> i32;
     fn GetAsyncKeyState(vkey: i32) -> i16;
     fn GetCursorPos(point: *mut NativePoint) -> i32;
+    fn GetForegroundWindow() -> *mut c_void;
     fn SetWindowDisplayAffinity(hwnd: *mut c_void, affinity: u32) -> i32;
 }
 
@@ -280,6 +282,13 @@ fn main() -> wry::Result<()> {
         let _ = keep_on_top_proxy.send_event(AppEvent::KeepOnTop);
     });
 
+    // Lets the toolbar close itself when the user clicks anywhere outside it.
+    let focus_check_proxy = proxy.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let _ = focus_check_proxy.send_event(AppEvent::ToolbarFocusCheck);
+    });
+
     // Mouse Button 4 (XBUTTON2) toggles the Personal Toolbar.
     let toolbar_mouse_proxy = proxy.clone();
     let _toolbar_mouse_thread = std::thread::spawn(move || {
@@ -397,6 +406,7 @@ fn main() -> wry::Result<()> {
     let mut toolbar_window: Option<Window> = None;
     let mut toolbar_webview: Option<WebView> = None;
     let mut toolbar_was_visible = false;
+    let mut toolbar_had_focus = false;
     let mut tablet_status_was_visible = false;
 
     event_loop.run(move |event, target, control_flow| {
@@ -408,6 +418,24 @@ fn main() -> wry::Result<()> {
                 let toolbar_open = toolbar_window.as_ref().map(Window::is_visible).unwrap_or(false);
                 if toolbar_open || cursor_over_window(&robot_window) {
                     toggle_toolbar(target, &mut toolbar_window, &mut toolbar_webview, &proxy);
+                    toolbar_had_focus = false;
+                }
+            }
+
+            Event::UserEvent(AppEvent::ToolbarFocusCheck) => {
+                if let Some(window) = toolbar_window.as_ref() {
+                    if window.is_visible() {
+                        let focused = unsafe { GetForegroundWindow() } == window.hwnd() as *mut c_void;
+                        if focused {
+                            toolbar_had_focus = true;
+                        } else if toolbar_had_focus {
+                            // It had focus and lost it: the user clicked somewhere else.
+                            window.set_visible(false);
+                            toolbar_had_focus = false;
+                        }
+                    } else {
+                        toolbar_had_focus = false;
+                    }
                 }
             }
 
