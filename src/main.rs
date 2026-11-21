@@ -72,6 +72,7 @@ enum AppEvent {
     Bridge(bridge::Event),
     TabletStatusMessage(String),
     HideTabletStatus(u64),
+    KeepOnTop,
 }
 
 #[repr(C)]
@@ -213,6 +214,14 @@ fn main() -> wry::Result<()> {
     *hotkey_proxy.lock().unwrap() = Some(proxy.clone());
 
     let (chat_hotkey_available, _scheduler_hotkey_available, _robot_hotkey_available) = register_global_hotkeys();
+
+    // Re-assert the robot's TOPMOST flag periodically; Windows can push it behind
+    // other topmost/fullscreen windows, leaving it alive but invisible.
+    let keep_on_top_proxy = proxy.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        let _ = keep_on_top_proxy.send_event(AppEvent::KeepOnTop);
+    });
 
     // Mouse Button 4 (XBUTTON2) toggles the Personal Toolbar.
     let toolbar_mouse_proxy = proxy.clone();
@@ -366,6 +375,13 @@ fn main() -> wry::Result<()> {
                         }
                         _ => {}
                     }
+                }
+            }
+
+            Event::UserEvent(AppEvent::KeepOnTop) => {
+                if robot_window.is_visible() {
+                    robot_window.set_always_on_top(false);
+                    robot_window.set_always_on_top(true);
                 }
             }
 
