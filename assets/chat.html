@@ -195,7 +195,7 @@ function startListening(){
     timer=setInterval(()=>{
       an.getByteTimeDomainData(data);let sum=0;for(let i=0;i<data.length;i++){const d=(data[i]-128)/128;sum+=d*d}
       const now=Date.now();if(Math.sqrt(sum/data.length)>0.02){voiced++;lastVoice=now}
-      if((voiced>=3&&now-lastVoice>800)||now-t0>(voiced?25000:15000)){clearInterval(timer);if(mr.state==='recording')mr.stop()}
+      if((voiced>=3&&now-lastVoice>600)||now-t0>(voiced?25000:15000)){clearInterval(timer);if(mr.state==='recording')mr.stop()}
     },100);
     mr.start();
   }).catch(error=>{
@@ -269,7 +269,7 @@ async function startLive(info){
     ws.send(JSON.stringify({realtimeInput:{audio:{data:b64FromInt16(i16),mimeType:'audio/pcm;rate=16000'}}}));
   };
   src.connect(proc);proc.connect(capCtx.destination);
-  ws.onopen=()=>ws.send(JSON.stringify({setup:{model:'models/'+info.model,responseModalities:['AUDIO'],systemInstruction:{parts:[{text:info.prompt}]},inputAudioTranscription:{},outputAudioTranscription:{}}}));
+  ws.onopen=()=>ws.send(JSON.stringify({setup:{model:'models/'+info.model,responseModalities:['AUDIO'],systemInstruction:{parts:[{text:info.prompt}]},inputAudioTranscription:{},outputAudioTranscription:{},realtimeInputConfig:{automaticActivityDetection:{silenceDurationMs:600}}}}));
   ws.onmessage=async ev=>{let m;try{m=JSON.parse(typeof ev.data==='string'?ev.data:await ev.data.text())}catch(e){return}if(live===l)handleLive(l,m)};
   ws.onclose=ev=>{
     if(live!==l)return;

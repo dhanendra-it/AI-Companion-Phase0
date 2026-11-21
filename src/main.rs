@@ -31,6 +31,7 @@ use tao::{
     platform::windows::{
         EventLoopBuilderExtWindows,
         WindowBuilderExtWindows,
+        WindowExtWindows,
     },
     window::{Window, WindowBuilder},
 };
@@ -43,8 +44,8 @@ const SCHEDULER_HTML: &str = include_str!("../assets/scheduler.html");
 const TABLET_STATUS_HTML: &str = include_str!("../assets/tablet-status.html");
 const PERSONAL_TOOLBAR_HTML: &str = include_str!("../assets/personal-toolbar.html");
 
-const ROBOT_WIDTH: f64 = 155.0;
-const ROBOT_HEIGHT: f64 = 195.0;
+const ROBOT_WIDTH: f64 = 132.0;
+const ROBOT_HEIGHT: f64 = 166.0;
 const ROBOT_MARGIN: f64 = 16.0;
 const CHAT_WIDTH: f64 = 420.0;
 const CHAT_HEIGHT: f64 = 560.0;
@@ -113,6 +114,29 @@ extern "system" {
     fn RegisterHotKey(hwnd: *mut c_void, id: i32, modifiers: u32, key: u32) -> i32;
     fn UnregisterHotKey(hwnd: *mut c_void, id: i32) -> i32;
     fn GetAsyncKeyState(vkey: i32) -> i16;
+    fn GetCursorPos(point: *mut NativePoint) -> i32;
+    fn SetWindowDisplayAffinity(hwnd: *mut c_void, affinity: u32) -> i32;
+}
+
+const WDA_NONE: u32 = 0x0;
+const WDA_EXCLUDEFROMCAPTURE: u32 = 0x11;
+
+/// True when the mouse cursor is inside the window's outer rectangle.
+fn cursor_over_window(window: &Window) -> bool {
+    let mut point = NativePoint { x: 0, y: 0 };
+    if unsafe { GetCursorPos(&mut point) } == 0 { return false; }
+    let (Ok(pos), size) = (window.outer_position(), window.outer_size()) else { return false; };
+    point.x >= pos.x && point.y >= pos.y
+        && point.x < pos.x + size.width as i32
+        && point.y < pos.y + size.height as i32
+}
+
+/// "Hide on SS": keep Aalu windows out of screenshots/screen capture while the setting is on.
+fn apply_capture_affinity(windows: &[Option<&Window>]) {
+    let affinity = if HIDE_ON_CAPTURE.load(AtomicOrdering::Relaxed) { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE };
+    for window in windows.iter().flatten() {
+        unsafe { SetWindowDisplayAffinity(window.hwnd() as *mut c_void, affinity); }
+    }
 }
 
 #[link(name = "kernel32")]
@@ -380,7 +404,11 @@ fn main() -> wry::Result<()> {
 
         match event {
             Event::UserEvent(AppEvent::ToggleToolbar) => {
-                toggle_toolbar(target, &mut toolbar_window, &mut toolbar_webview, &proxy);
+                // Open only when the cursor is on the robot; if already open, the button closes it.
+                let toolbar_open = toolbar_window.as_ref().map(Window::is_visible).unwrap_or(false);
+                if toolbar_open || cursor_over_window(&robot_window) {
+                    toggle_toolbar(target, &mut toolbar_window, &mut toolbar_webview, &proxy);
+                }
             }
 
             Event::UserEvent(AppEvent::ToolbarMessage(raw)) => {
@@ -396,6 +424,7 @@ fn main() -> wry::Result<()> {
                 } else if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&raw) {
                     if let Some(hide) = msg.get("hide_on_capture").and_then(|v| v.as_bool()) {
                         HIDE_ON_CAPTURE.store(hide, AtomicOrdering::Relaxed);
+                        apply_capture_affinity(&[Some(&robot_window), chat_window.as_ref(), scheduler_window.as_ref(), toolbar_window.as_ref(), tablet_status_window.as_ref()]);
                     }
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
@@ -416,6 +445,7 @@ fn main() -> wry::Result<()> {
                     robot_window.set_always_on_top(false);
                     robot_window.set_always_on_top(true);
                 }
+                apply_capture_affinity(&[Some(&robot_window), chat_window.as_ref(), scheduler_window.as_ref(), toolbar_window.as_ref(), tablet_status_window.as_ref()]);
             }
 
             Event::UserEvent(AppEvent::ToggleRobotHotkey) => {
@@ -719,6 +749,9 @@ fn main() -> wry::Result<()> {
                     }
 
                     backend::Out::Overlays(show) => {
+                        if !show {
+                            apply_capture_affinity(&[Some(&robot_window), chat_window.as_ref(), scheduler_window.as_ref(), toolbar_window.as_ref(), tablet_status_window.as_ref()]);
+                        }
                         robot_window.set_visible(show);
                         let _ = robot_webview.evaluate_script(&format!("window.__setAppVisible({show})"));
 

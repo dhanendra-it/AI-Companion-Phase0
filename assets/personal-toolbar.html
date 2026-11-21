@@ -125,6 +125,8 @@ document.getElementById("cancel").onclick=()=>document.getElementById("modal").c
 document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),target=document.getElementById("target").value.trim(),kind=document.getElementById("kind").value;if(!name||!target)return;data[addTo]=data[addTo]||[];data[addTo].push({name,target,kind});persist();document.getElementById("modal").classList.remove("open");render()};
 center.onclick=()=>{if(view===null)window.ipc.postMessage("close");else{view=null;render()}};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(document.getElementById("modal").classList.contains("open"))document.getElementById("modal").classList.remove("open");else if(view!==null){view=null;render()}else window.ipc.postMessage("close")}});
+// Click on empty space (anything that is not a slot, the centre, or the add dialog) closes the toolbar.
+document.addEventListener("click",e=>{if(document.getElementById("modal").classList.contains("open"))return;if(e.target.closest&&e.target.closest(".slot,#center,#modal"))return;window.ipc.postMessage("close")});
 document.addEventListener("wheel",e=>{if(view===null)return;page=Math.max(0,page+(e.deltaY>0?1:-1));render()},{passive:true});
 window.__reset=()=>{view=null;page=0;document.getElementById("modal").classList.remove("open");render()};
 
