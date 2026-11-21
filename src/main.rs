@@ -75,6 +75,7 @@ enum AppEvent {
     HideTabletStatus(u64),
     KeepOnTop,
     ToolbarFocusCheck,
+    ToolbarPicked(String),
 }
 
 #[repr(C)]
@@ -407,6 +408,7 @@ fn main() -> wry::Result<()> {
     let mut toolbar_webview: Option<WebView> = None;
     let mut toolbar_was_visible = false;
     let mut toolbar_had_focus = false;
+    let mut toolbar_picking = false;
     let mut tablet_status_was_visible = false;
 
     event_loop.run(move |event, target, control_flow| {
@@ -422,13 +424,24 @@ fn main() -> wry::Result<()> {
                 }
             }
 
+            Event::UserEvent(AppEvent::ToolbarPicked(path)) => {
+                toolbar_picking = false;
+                if let Some(view) = toolbar_webview.as_ref() {
+                    let js = serde_json::to_string(&path).unwrap_or_else(|_| "\"\"".into());
+                    let _ = view.evaluate_script(&format!("window.__picked && window.__picked({js})"));
+                }
+                if let Some(window) = toolbar_window.as_ref() {
+                    if window.is_visible() { window.set_focus(); }
+                }
+            }
+
             Event::UserEvent(AppEvent::ToolbarFocusCheck) => {
                 if let Some(window) = toolbar_window.as_ref() {
                     if window.is_visible() {
                         let focused = unsafe { GetForegroundWindow() } == window.hwnd() as *mut c_void;
                         if focused {
                             toolbar_had_focus = true;
-                        } else if toolbar_had_focus {
+                        } else if toolbar_had_focus && !toolbar_picking {
                             // It had focus and lost it: the user clicked somewhere else.
                             window.set_visible(false);
                             toolbar_had_focus = false;
@@ -458,6 +471,10 @@ fn main() -> wry::Result<()> {
                     match msg.get("t").and_then(|v| v.as_str()) {
                         Some("open-url") if target.starts_with("https://") || target.starts_with("http://") => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
                         Some("launch-app") if !target.trim().is_empty() => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
+                        Some("pick") => {
+                            toolbar_picking = true;
+                            pick_path(msg.get("mode").and_then(|v| v.as_str()).unwrap_or("file"), proxy.clone());
+                        }
                         Some("set-setting") => {
                             if let Some(val) = msg.get("hide_on_capture").and_then(|v| v.as_bool()) {
                                 HIDE_ON_CAPTURE.store(val, AtomicOrdering::Relaxed);
@@ -862,6 +879,28 @@ fn main() -> wry::Result<()> {
 
             _ => {}
         }
+    });
+}
+
+/// Native file/folder chooser for the Personal Toolbar's Add dialog (PowerShell, no extra crates).
+fn pick_path(mode: &str, proxy: EventLoopProxy<AppEvent>) {
+    let body = if mode == "folder" {
+        "$d=New-Object System.Windows.Forms.FolderBrowserDialog; if($d.ShowDialog($f) -eq 'OK'){[Console]::Out.Write($d.SelectedPath)}"
+    } else {
+        "$d=New-Object System.Windows.Forms.OpenFileDialog; $d.DereferenceLinks=$false; if($d.ShowDialog($f) -eq 'OK'){[Console]::Out.Write($d.FileName)}"
+    };
+    let script = format!(
+        "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $f=New-Object System.Windows.Forms.Form -Property @{{TopMost=$true}}; {body}"
+    );
+    std::thread::spawn(move || {
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-STA", "-WindowStyle", "Hidden", "-Command", &script])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .output();
+        let path = output
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+        let _ = proxy.send_event(AppEvent::ToolbarPicked(path));
     });
 }
 

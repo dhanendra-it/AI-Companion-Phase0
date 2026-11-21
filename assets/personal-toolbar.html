@@ -7,7 +7,7 @@
 :root{font-family:Inter,"Segoe UI",sans-serif;color:#f1f2f6}
 *{box-sizing:border-box;user-select:none}
 html,body{margin:0;height:100%;background:transparent;overflow:hidden}
-.panel{position:relative;width:100vw;height:100vh;border-radius:64px;background:rgba(38,38,42,.78);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 18px 50px rgba(0,0,0,.45);overflow:hidden}
+.panel{position:absolute;inset:22px;border-radius:56px;background:linear-gradient(160deg,rgba(54,56,66,.92),rgba(27,28,34,.94));border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 6px 20px rgba(0,0,0,.4);overflow:hidden}
 .center{position:absolute;left:50%;top:50%;width:39%;height:39%;transform:translate(-50%,-50%);border-radius:38px;background:rgba(18,18,20,.55);display:grid;place-items:center;text-align:center;font-size:14px;font-weight:600;cursor:pointer;padding:10px}
 .center small{display:block;margin-top:6px;font-size:11px;font-weight:500;color:#9a9eaa}
 .slot{position:absolute;width:98px;transform:translate(-50%,-50%);text-align:center;cursor:pointer}
@@ -18,13 +18,14 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 .badge{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:19px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px rgba(0,0,0,.35)}
 .badge svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.lbl{margin-top:6px;font-size:11.5px;font-weight:600;color:#e7e8ee;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sublbl{font-size:10px;color:#5eead4;font-weight:700;margin-top:2px;white-space:nowrap}
-.sublbl.off{color:#f87171}
+.sublbl.off{color:#9aa3b8}
 .toggle-on{background:linear-gradient(135deg,#0e9f6e,#057a55)!important;color:#fff!important;box-shadow:0 0 14px rgba(14,159,110,0.55)!important}
-.toggle-off{background:linear-gradient(135deg,#ef4444,#b91c1c)!important;color:#fff!important;box-shadow:0 0 14px rgba(239,68,68,0.4)!important}
+.toggle-off{background:linear-gradient(135deg,#4b5266,#343a4a)!important;color:#fff!important}
 .add .ico{border:1.5px dashed rgba(255,255,255,.28);font-size:24px;color:#c4c7d2}
 .modal{display:none;position:absolute;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:24px;z-index:5}.modal.open{display:flex}
 .dialog{width:100%;background:#1d1f27;border:1px solid #43485a;border-radius:20px;padding:18px;display:grid;gap:10px}.dialog h2{margin:0 0 2px;font-size:15px}
 .dialog input,.dialog select{background:#10121a;border:1px solid #393f52;color:#fff;padding:9px 11px;border-radius:10px;outline:none;font-size:13px;user-select:text}
+.pickrow{display:none;gap:8px}.pickrow button{flex:1;border:0;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:700;font-size:12px;background:#2b3242;color:#dce1ed}.pickrow button:hover{background:#37405a}
 .actions{display:flex;justify-content:flex-end;gap:8px}.actions button{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700}
 .primary{background:#7c8cff;color:#101321}.secondary{background:#2b3242;color:#dce1ed}
 </style>
@@ -32,7 +33,7 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 <body>
 <div class="panel" id="panel">
   <div class="center" id="center"></div>
-  <div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle">Add item</h2><input id="name" placeholder="Name"><input id="target" placeholder="URL, app path, or text"><select id="kind"><option value="url">Website / URL</option><option value="app">Desktop app / folder path</option><option value="text">Text (copy to clipboard)</option></select><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Save</button></div></div></div>
+  <div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle">Add item</h2><input id="name" placeholder="Name"><input id="target" placeholder="URL, app path, or text"><div class="pickrow" id="pickRow"><button type="button" id="pickFile">Browse file / app</button><button type="button" id="pickFolder">Browse folder</button></div><select id="kind"><option value="url">Website / URL</option><option value="app">Desktop app / folder path</option><option value="text">Text (copy to clipboard)</option></select><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Save</button></div></div></div>
 </div>
 <script>
 // Slot centres as % of the 500x500 panel, clockwise from top-left (matches the reference layout).
@@ -89,13 +90,13 @@ function render(){clear();
   for(let n=0;n<4;n++){const a=apps[n];if(a)itemSlot(4+n,a,true,n,"Apps");else if(n===apps.length)addSlot(4+n,"Apps","Add app")}
  }else if(view==="Settings"){
   center.innerHTML="Settings<small>Click option to toggle · Back</small>";
-  const isHide=settings.hideOnCapture!==false;
+  const isShow=settings.hideOnCapture===false;
   slot(0,
-    `<div class="ico"><div class="badge ${isHide?'toggle-on':'toggle-off'}"><svg viewBox="0 0 32 32">${isHide?ICONS.check:ICONS.eyeOff}</svg></div></div>`+
-    `<div class="lbl">Hide on SS</div>`+
-    `<div class="sublbl ${isHide?'':'off'}">${isHide?'ON (Hidden)':'OFF (Visible)'}</div>`,
+    `<div class="ico"><div class="badge ${isShow?'toggle-on':'toggle-off'}"><svg viewBox="0 0 32 32">${isShow?ICONS.check:ICONS.eyeOff}</svg></div></div>`+
+    `<div class="lbl">Show in SS</div>`+
+    `<div class="sublbl ${isShow?'':'off'}">${isShow?'ON · visible':'OFF · hidden'}</div>`,
     ()=>{
-      settings.hideOnCapture=!isHide;
+      settings.hideOnCapture=isShow;
       persistSettings();
       render();
     }
@@ -120,7 +121,12 @@ function activate(x){
 
 let addTo=null;
 function openModal(listKey){addTo=listKey;const k=document.getElementById("kind");document.getElementById("name").value="";document.getElementById("target").value="";
- k.value=listKey==="Apps"||listKey==="Folders"?"app":listKey==="Commands"?"text":"url";document.getElementById("modal").classList.add("open");document.getElementById("name").focus()}
+ k.value=listKey==="Apps"||listKey==="Folders"?"app":listKey==="Commands"?"text":"url";syncPick();document.getElementById("modal").classList.add("open");document.getElementById("name").focus()}
+function syncPick(){document.getElementById("pickRow").style.display=document.getElementById("kind").value==="app"?"flex":"none"}
+document.getElementById("kind").onchange=syncPick;
+document.getElementById("pickFile").onclick=()=>window.ipc.postMessage(JSON.stringify({t:"pick",mode:"file"}));
+document.getElementById("pickFolder").onclick=()=>window.ipc.postMessage(JSON.stringify({t:"pick",mode:"folder"}));
+window.__picked=p=>{if(!p)return;document.getElementById("target").value=p;document.getElementById("kind").value="app";syncPick();const n=document.getElementById("name");if(!n.value.trim()){const base=p.replace(/[\\/]+$/,"").split(/[\\/]/).pop()||p;n.value=base.replace(/\.[^.]+$/,"")}};
 document.getElementById("cancel").onclick=()=>document.getElementById("modal").classList.remove("open");
 document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),target=document.getElementById("target").value.trim(),kind=document.getElementById("kind").value;if(!name||!target)return;data[addTo]=data[addTo]||[];data[addTo].push({name,target,kind});persist();document.getElementById("modal").classList.remove("open");render()};
 center.onclick=()=>{if(view===null)window.ipc.postMessage("close");else{view=null;render()}};
