@@ -1,5 +1,6 @@
 # Rust build output
 /target/
+/target-single/
 
 # Generated memory measurements
 /ram-measurements*.csv

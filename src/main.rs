@@ -102,6 +102,7 @@ const VK_SPACE: u32 = 0x20;
 const VK_UP: u32 = 0x26;
 const VK_RCONTROL: i32 = 0xA3;
 const VK_XBUTTON2: i32 = 0x06;
+const ERROR_ALREADY_EXISTS: u32 = 183;
 
 // User setting: hide Aalu windows during screen capture (default: true).
 // Toggled from the Personal Toolbar → Settings section.
@@ -114,6 +115,31 @@ extern "system" {
     fn GetAsyncKeyState(vkey: i32) -> i16;
 }
 
+#[link(name = "kernel32")]
+extern "system" {
+    fn CreateMutexW(attributes: *mut c_void, initial_owner: i32, name: *const u16) -> *mut c_void;
+    fn GetLastError() -> u32;
+    fn CloseHandle(handle: *mut c_void) -> i32;
+}
+
+/// Keep one Aalu process per Windows session so global hotkeys and input hooks cannot compete.
+fn acquire_single_instance() -> bool {
+    let name: Vec<u16> = "Local\\Aalu.Companion.SingleInstance\0".encode_utf16().collect();
+    unsafe {
+        let handle = CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr());
+        if handle.is_null() {
+            eprintln!("Could not create Aalu's single-instance mutex ({}).", GetLastError());
+            return true;
+        }
+        if GetLastError() == ERROR_ALREADY_EXISTS {
+            let _ = CloseHandle(handle);
+            return false;
+        }
+        // Intentionally keep this handle open until process exit.
+        true
+    }
+}
+
 fn register_global_hotkeys() -> (bool, bool, bool) {
     let hwnd = std::ptr::null_mut();
     let chat = unsafe { RegisterHotKey(hwnd, HOTKEY_CHAT_ID, MOD_ALT | MOD_NOREPEAT, VK_SPACE) } != 0;
@@ -122,6 +148,7 @@ fn register_global_hotkeys() -> (bool, bool, bool) {
     if !chat { eprintln!("Could not register Alt+Space for chat."); }
     if !scheduler { eprintln!("Could not register Ctrl+Space for scheduler."); }
     if !robot { eprintln!("Could not register Right Ctrl+Up for robot visibility."); }
+    bridge::log(&format!("global hotkeys registered: chat={chat}, scheduler={scheduler}, robot={robot}"));
     (chat, scheduler, robot)
 }
 
@@ -180,6 +207,11 @@ fn robot_start_position(
 }
 
 fn main() -> wry::Result<()> {
+    if !acquire_single_instance() {
+        bridge::log("ignored duplicate launch: an Aalu instance is already running");
+        return Ok(());
+    }
+
     let mut builder =
         EventLoopBuilder::<AppEvent>::with_user_event();
 
@@ -191,6 +223,7 @@ fn main() -> wry::Result<()> {
     builder.with_msg_hook(move |raw| {
         let msg = unsafe { &*(raw as *const NativeMessage) };
         if msg.message == WM_HOTKEY {
+            bridge::log(&format!("global WM_HOTKEY id={}", msg.wparam));
             let event = match msg.wparam as i32 {
                 HOTKEY_CHAT_ID => Some(AppEvent::ToggleChatHotkey),
                 HOTKEY_SCHEDULER_ID if unsafe { GetAsyncKeyState(VK_RCONTROL) as u16 & 0x8000 != 0 } => Some(AppEvent::ToggleSchedulerHotkey),
