@@ -51,6 +51,27 @@ pub enum Event {
 /// Only bridge events are written: hook/adb/connection steps and the two shortcut keys.
 /// Typed text and ordinary keys are never logged.
 pub fn log(msg: &str) {
+    use std::sync::{mpsc, OnceLock};
+    // The hooks call this from inside Windows' input path, so it must never touch the disk
+    // itself: a slow write there gets the hook silently removed. It only queues the line.
+    static TX: OnceLock<mpsc::Sender<(u128, String)>> = OnceLock::new();
+    let tx = TX.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<(u128, String)>();
+        let _ = std::thread::Builder::new().name("aalu-log".into()).spawn(move || {
+            for (ms, line) in rx {
+                write_log_line(ms, &line);
+            }
+        });
+        tx
+    });
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let _ = tx.send((ms, msg.to_string()));
+}
+
+fn write_log_line(ms: u128, msg: &str) {
     use std::io::Write;
     let Some(base) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("TEMP")) else { return };
     let dir = std::path::PathBuf::from(base).join("Aalu");
@@ -59,10 +80,6 @@ pub fn log(msg: &str) {
     if f.metadata().map(|m| m.len()).unwrap_or(0) > 262_144 {
         let _ = f.set_len(0);
     }
-    let ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
     let _ = writeln!(f, "[{ms}] {msg}");
 }
 
