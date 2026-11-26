@@ -107,9 +107,8 @@ const VK_RCONTROL: i32 = 0xA3;
 const VK_XBUTTON2: i32 = 0x06;
 const ERROR_ALREADY_EXISTS: u32 = 183;
 
-// User setting: hide Aalu windows during screen capture (default: true).
-// Toggled from the Personal Toolbar → Settings section.
-static HIDE_ON_CAPTURE: AtomicBool = AtomicBool::new(true);
+// Controls screenshot visibility of the robot window only. Visible by default.
+static ROBOT_VISIBLE_IN_CAPTURE: AtomicBool = AtomicBool::new(true);
 
 #[link(name = "user32")]
 extern "system" {
@@ -152,12 +151,31 @@ fn cursor_over_window(window: &Window) -> bool {
         && point.y < pos.y + size.height as i32
 }
 
-/// "Hide on SS": keep Aalu windows out of screenshots/screen capture while the setting is on.
-fn apply_capture_affinity(windows: &[Option<&Window>]) {
-    let affinity = if HIDE_ON_CAPTURE.load(AtomicOrdering::Relaxed) { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE };
-    for window in windows.iter().flatten() {
-        unsafe { SetWindowDisplayAffinity(window.hwnd() as *mut c_void, affinity); }
-    }
+const CAPTURE_SETTING_KEY: &str = r"HKCU\Software\Aalu";
+
+fn load_robot_capture_setting() -> bool {
+    let output = Command::new("reg.exe")
+        .args(["query", CAPTURE_SETTING_KEY, "/v", "RobotVisibleInCapture"])
+        .creation_flags(0x0800_0000)
+        .output();
+    let Ok(output) = output else { return true };
+    if !output.status.success() { return true; }
+    let text = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    text.split_whitespace().last().map(|value| value != "0x0").unwrap_or(true)
+}
+
+fn save_robot_capture_setting(visible: bool) {
+    let value = if visible { "1" } else { "0" };
+    let _ = Command::new("reg.exe")
+        .args(["add", CAPTURE_SETTING_KEY, "/v", "RobotVisibleInCapture", "/t", "REG_DWORD", "/d", value, "/f"])
+        .creation_flags(0x0800_0000)
+        .output();
+}
+
+/// Apply screenshot affinity to the robot HWND only. Chat, scheduler and toolbar are untouched.
+fn apply_robot_capture_affinity(window: &Window) {
+    let affinity = if ROBOT_VISIBLE_IN_CAPTURE.load(AtomicOrdering::Relaxed) { WDA_NONE } else { WDA_EXCLUDEFROMCAPTURE };
+    unsafe { SetWindowDisplayAffinity(window.hwnd() as *mut c_void, affinity); }
 }
 
 #[link(name = "kernel32")]
@@ -320,6 +338,7 @@ fn robot_start_position(
 }
 
 fn main() -> wry::Result<()> {
+    ROBOT_VISIBLE_IN_CAPTURE.store(load_robot_capture_setting(), AtomicOrdering::Relaxed);
     if !acquire_single_instance() {
         bridge::log("ignored duplicate launch: an Aalu instance is already running");
         return Ok(());
@@ -403,7 +422,7 @@ fn main() -> wry::Result<()> {
             key_set: keys::set,
             screen_text,
             screen_jpeg,
-            hide_on_capture: || HIDE_ON_CAPTURE.load(AtomicOrdering::Relaxed),
+            hide_on_capture: || !ROBOT_VISIBLE_IN_CAPTURE.load(AtomicOrdering::Relaxed),
         },
         emit,
         if chat_hotkey_available { "Alt+Space".to_string() } else { String::new() },
@@ -437,6 +456,8 @@ fn main() -> wry::Result<()> {
         .with_visible(false)
         .build(&event_loop)
         .expect("create robot window");
+
+    apply_robot_capture_affinity(&robot_window);
 
     let robot_webview = {
         let mut created = None;
@@ -549,9 +570,10 @@ fn main() -> wry::Result<()> {
                         _ => AppEvent::ToggleSchedulerHotkey,
                     });
                 } else if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&raw) {
-                    if let Some(hide) = msg.get("hide_on_capture").and_then(|v| v.as_bool()) {
-                        HIDE_ON_CAPTURE.store(hide, AtomicOrdering::Relaxed);
-                        apply_capture_affinity(&[Some(&robot_window), chat_window.as_ref(), scheduler_window.as_ref(), toolbar_window.as_ref(), tablet_status_window.as_ref()]);
+                    if let Some(visible) = msg.get("robot_visible_in_capture").and_then(|v| v.as_bool()) {
+                        ROBOT_VISIBLE_IN_CAPTURE.store(visible, AtomicOrdering::Relaxed);
+                        save_robot_capture_setting(visible);
+                        apply_robot_capture_affinity(&robot_window);
                     }
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
@@ -569,8 +591,10 @@ fn main() -> wry::Result<()> {
                             pick_path(msg.get("mode").and_then(|v| v.as_str()).unwrap_or("file"), proxy.clone());
                         }
                         Some("set-setting") => {
-                            if let Some(val) = msg.get("hide_on_capture").and_then(|v| v.as_bool()) {
-                                HIDE_ON_CAPTURE.store(val, AtomicOrdering::Relaxed);
+                            if let Some(val) = msg.get("robot_visible_in_capture").and_then(|v| v.as_bool()) {
+                                ROBOT_VISIBLE_IN_CAPTURE.store(val, AtomicOrdering::Relaxed);
+                                save_robot_capture_setting(val);
+                                apply_robot_capture_affinity(&robot_window);
                             }
                         }
                         _ => {}
@@ -583,7 +607,7 @@ fn main() -> wry::Result<()> {
                     robot_window.set_always_on_top(false);
                     robot_window.set_always_on_top(true);
                 }
-                apply_capture_affinity(&[Some(&robot_window), chat_window.as_ref(), scheduler_window.as_ref(), toolbar_window.as_ref(), tablet_status_window.as_ref()]);
+                apply_robot_capture_affinity(&robot_window);
             }
 
             Event::UserEvent(AppEvent::ToggleRobotHotkey) => {
@@ -888,7 +912,7 @@ fn main() -> wry::Result<()> {
 
                     backend::Out::Overlays(show) => {
                         if !show {
-                            apply_capture_affinity(&[Some(&robot_window), chat_window.as_ref(), scheduler_window.as_ref(), toolbar_window.as_ref(), tablet_status_window.as_ref()]);
+                            apply_robot_capture_affinity(&robot_window);
                         }
                         robot_window.set_visible(show);
                         let _ = robot_webview.evaluate_script(&format!("window.__setAppVisible({show})"));
