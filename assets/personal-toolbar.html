@@ -19,6 +19,8 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 .badge svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.lbl{margin-top:6px;font-size:11.5px;font-weight:600;color:#e7e8ee;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sublbl{font-size:10px;color:#5eead4;font-weight:700;margin-top:2px;white-space:nowrap}
 .sublbl.off{color:#9aa3b8}
+.shortcut-target{max-width:98px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aeb8ca;font-weight:500}
+.shortcut-delete{position:absolute;top:-2px;right:5px;width:19px;height:19px;border:1px solid #626b7e;border-radius:50%;background:#252b38;color:#fff;font-size:15px;line-height:15px;cursor:pointer;z-index:2}
 .toggle-on{background:linear-gradient(135deg,#0e9f6e,#057a55)!important;color:#fff!important;box-shadow:0 0 14px rgba(14,159,110,0.55)!important}
 .toggle-off{background:linear-gradient(135deg,#4b5266,#343a4a)!important;color:#fff!important}
 .add .ico{border:1.5px dashed rgba(255,255,255,.28);font-size:24px;color:#c4c7d2}
@@ -71,9 +73,9 @@ let toastTimer=null;
 function notify(message,isError=false){toast.textContent=message;toast.className="toast show"+(isError?" error":"");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.className="toast",2600)}
 function sendNative(message){try{if(!window.ipc||typeof window.ipc.postMessage!=="function")throw new Error("Native toolbar bridge is unavailable");window.ipc.postMessage(typeof message==="string"?message:JSON.stringify(message));return true}catch(error){notify(error.message||"Could not send action to Aalu",true);return false}}
 
-function loadSettings(){try{const s=JSON.parse(localStorage.getItem(settingsKey)||"{}");return{hideOnCapture:s.hideOnCapture!==false}}catch(e){return{hideOnCapture:true}}}
-function persistSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(error){notify("Could not save settings in this WebView",true)}sendNative({t:"set-setting",hide_on_capture:settings.hideOnCapture})}
-window.__setSettings=function(s){if(s&&typeof s.hideOnCapture==="boolean"){settings.hideOnCapture=s.hideOnCapture;try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(e){}render()}};
+function loadSettings(){try{const s=JSON.parse(localStorage.getItem(settingsKey)||"{}");return{showRobotInCapture:s.showRobotInCapture!==false}}catch(e){return{showRobotInCapture:true}}}
+function persistSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(error){notify("Could not save settings in this WebView",true)}sendNative({t:"set-setting",robot_visible_in_capture:settings.showRobotInCapture})}
+window.__setSettings=function(s){if(s&&typeof s.showRobotInCapture==="boolean"){settings.showRobotInCapture=s.showRobotInCapture;try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(e){}render()}};
 
 function load(){try{const value=JSON.parse(localStorage.getItem(key)||"{}");if(!value||typeof value!=="object"||Array.isArray(value))return{};const clean={};for(const [name,items] of Object.entries(value)){if(Array.isArray(items))clean[name]=items.filter(x=>x&&typeof x.name==="string"&&typeof x.target==="string"&&typeof x.kind==="string")}return clean}catch{return{}}}
 function persist(){try{localStorage.setItem(key,JSON.stringify(data));return true}catch(error){notify("Could not save toolbar items. Check WebView storage permissions.",true);return false}}
@@ -83,7 +85,8 @@ function slot(i,html,onclick,extra){const[x,y]=SLOTS[i];const d=document.createE
 function sectionSlot(i,k,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+SVG[k]+'</svg><span class="chev">›</span></div><div class="lbl">'+label+'</div>',()=>{view=k;page=0;render()})}
 function badge(x){const el=document.createElement("div");el.className="badge";if(x.icon&&ICONS[x.icon]){el.style.background="rgba(255,255,255,.1)";el.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+ICONS[x.icon]+'</svg>'}else{const h=hue(x.name);el.style.background="linear-gradient(145deg,hsl("+h+" 70% 58%),hsl("+(h+40)+" 70% 38%))";el.textContent=(x.name[0]||"?").toUpperCase()}return el}
 function itemSlot(i,x,removable,idx,listKey){const d=slot(i,'<div class="ico"></div><div class="lbl"></div>',()=>activate(x));d.querySelector(".ico").append(badge(x));d.querySelector(".lbl").textContent=x.name;
- if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){const removed=data[listKey].splice(idx,1)[0];if(!persist()){data[listKey].splice(idx,0,removed);return}render();notify("Removed "+x.name)}}}
+ if(listKey==="Shortcuts"){const detail=document.createElement("div");detail.className="sublbl shortcut-target";detail.textContent=x.target;detail.title=x.target;d.append(detail)}
+ if(removable){const remove=()=>{if(confirm('Delete "'+x.name+'"?')){const removed=data[listKey].splice(idx,1)[0];if(!persist()){data[listKey].splice(idx,0,removed);return}render();notify("Deleted "+x.name)}};d.oncontextmenu=e=>{e.preventDefault();remove()};if(listKey==="Shortcuts"){const del=document.createElement("button");del.type="button";del.className="shortcut-delete";del.textContent="×";del.title="Delete shortcut";del.onclick=e=>{e.stopPropagation();remove()};d.append(del)}}}
 function addSlot(i,listKey,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+ICONS.plus+'</svg></div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
 
 function render(){clear();
@@ -95,13 +98,13 @@ function render(){clear();
   for(let n=0;n<4;n++){const a=apps[n];if(a)itemSlot(4+n,a,true,n,"Apps");else if(n===apps.length)addSlot(4+n,"Apps","Add app")}
  }else if(view==="Settings"){
   center.innerHTML="Settings<small>Click option to toggle · Back</small>";
-  const isShow=settings.hideOnCapture===false;
+  const isShow=settings.showRobotInCapture!==false;
   slot(0,
     `<div class="ico"><div class="badge ${isShow?'toggle-on':'toggle-off'}"><svg viewBox="0 0 32 32">${isShow?ICONS.check:ICONS.eyeOff}</svg></div></div>`+
-    `<div class="lbl">Show in SS</div>`+
-    `<div class="sublbl ${isShow?'':'off'}">${isShow?'ON · visible':'OFF · hidden'}</div>`,
+    `<div class="lbl">Show robot in screenshots</div>`+
+    `<div class="sublbl ${isShow?'':'off'}">${isShow?'ON · robot visible':'OFF · robot hidden'}</div>`,
     ()=>{
-      settings.hideOnCapture=isShow;
+      settings.showRobotInCapture=!isShow;
       persistSettings();
       render();
     }
@@ -145,7 +148,7 @@ document.addEventListener("wheel",e=>{if(view===null)return;page=Math.max(0,page
 window.__reset=()=>{view=null;page=0;document.getElementById("modal").classList.remove("open");render()};
 
 // Initial sync with backend
-try{sendNative({t:"set-setting",hide_on_capture:settings.hideOnCapture})}catch(e){}
+try{sendNative({t:"set-setting",robot_visible_in_capture:settings.showRobotInCapture})}catch(e){}
 render();
 </script>
 </body></html>
