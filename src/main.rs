@@ -990,9 +990,15 @@ fn pick_path(mode: &str, proxy: EventLoopProxy<AppEvent>) {
             .args(["-NoProfile", "-STA", "-WindowStyle", "Hidden", "-Command", &script])
             .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
             .output();
-        let path = output
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .unwrap_or_default();
+        let path = match output {
+            Ok(result) if result.status.success() => String::from_utf8_lossy(&result.stdout).trim().to_string(),
+            Ok(result) => {
+                let detail = String::from_utf8_lossy(&result.stderr).trim().to_string();
+                if detail.is_empty() { format!("__AALU_ERROR__File picker exited with status {}", result.status) }
+                else { format!("__AALU_ERROR__File picker failed: {}", detail.chars().take(180).collect::<String>()) }
+            }
+            Err(error) => format!("__AALU_ERROR__Could not start Windows file picker: {error}"),
+        };
         let _ = proxy.send_event(AppEvent::ToolbarPicked(path));
     });
 }
