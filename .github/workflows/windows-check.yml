@@ -21,6 +21,21 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Set up Node.js for toolbar script validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate Personal Toolbar JavaScript
+        shell: pwsh
+        run: |
+          $html = Get-Content "assets/personal-toolbar.html" -Raw
+          $match = [regex]::Match($html, '(?s)<script>(.*?)</script>')
+          if (-not $match.Success) { throw "Personal Toolbar script tag was not found" }
+          $scriptPath = Join-Path $env:RUNNER_TEMP "personal-toolbar.js"
+          Set-Content -Path $scriptPath -Value $match.Groups[1].Value -Encoding utf8
+          node --check $scriptPath
+
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
