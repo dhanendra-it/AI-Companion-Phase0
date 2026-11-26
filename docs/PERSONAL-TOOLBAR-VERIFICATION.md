@@ -6,10 +6,12 @@ The toolbar is hosted in the Windows WebView2 window and uses Windows Shell/clip
 
 The `.github/workflows/windows-check.yml` workflow runs:
 
+- Node syntax validation for the embedded toolbar script
+- `node --test tests/personal-toolbar.test.cjs` using jsdom
 - `cargo check --locked --release`
 - `cargo test --locked`
 
-A green workflow confirms the Rust project compiles and its Rust unit tests pass. It does not exercise interactive WebView2 behavior.
+The toolbar regression tests exercise snippet creation and multiline Unicode clipboard messages, storage across reloads, bookmark URL dispatch, folder-picker requests and launch messages, Window Manager navigation/actions, removal, and pagination. A green workflow confirms these source-level/UI-logic checks and Rust compilation/tests pass. It does not replace the native Windows smoke tests below.
 
 ## Manual smoke test
 
