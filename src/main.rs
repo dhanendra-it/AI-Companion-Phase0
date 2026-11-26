@@ -1432,8 +1432,8 @@ fn toggle_toolbar(
         let visible = window.is_visible();
         if !visible {
             if let Some(view) = webview_slot.as_ref() {
-                let hide = HIDE_ON_CAPTURE.load(AtomicOrdering::Relaxed);
-                let _ = view.evaluate_script(&format!("window.__setSettings && window.__setSettings({{hideOnCapture: {hide}}}); window.__reset && window.__reset();"));
+                let show = ROBOT_VISIBLE_IN_CAPTURE.load(AtomicOrdering::Relaxed);
+                let _ = view.evaluate_script(&format!("window.__setSettings && window.__setSettings({{showRobotInCapture: {show}}}); window.__reset && window.__reset();"));
             }
             center_toolbar(target, window);
         }
