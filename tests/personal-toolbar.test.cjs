@@ -117,15 +117,32 @@ test("screenshot exclusion toggle synchronizes with the native setting", () => {
   app.dom.window.close();
 });
 
+test("robot sounds and reminder sound have independent mute switches", () => {
+  const app = boot();
+  const sent = () => app.messages.map((x) => { try { return JSON.parse(x); } catch { return x; } })
+    .filter((x) => x && x.t === "set-setting");
+  clickLabel(app.document, "Settings");
+  clickLabel(app.document, "Mute reminder sound");
+  assert.equal(sent().at(-1).reminder_muted, true);
+  assert.equal(sent().at(-1).robot_muted, false, "robot sounds stay on");
+  clickLabel(app.document, "Mute robot sounds");
+  assert.equal(sent().at(-1).robot_muted, true);
+  assert.equal(sent().at(-1).reminder_muted, true, "reminder stays muted");
+  clickLabel(app.document, "Unmute reminder sound");
+  assert.equal(sent().at(-1).reminder_muted, false);
+  assert.equal(sent().at(-1).robot_muted, true, "robot sounds stay muted");
+  app.dom.window.close();
+});
+
 test("Settings can mute and unmute the robot and tells the native app", () => {
   const app = boot();
   const sent = () => app.messages.map((x) => { try { return JSON.parse(x); } catch { return x; } })
     .filter((x) => x && x.t === "set-setting");
   clickLabel(app.document, "Settings");
-  clickLabel(app.document, "Mute robot");
+  clickLabel(app.document, "Mute robot sounds");
   assert.equal(sent().at(-1).robot_muted, true);
   assert.equal(JSON.parse(app.window.localStorage.getItem("aalu.settings.v1")).robotMuted, true);
-  clickLabel(app.document, "Unmute robot");
+  clickLabel(app.document, "Unmute robot sounds");
   assert.equal(sent().at(-1).robot_muted, false);
   app.dom.window.close();
 });
@@ -136,7 +153,7 @@ test("native-provided mute state wins over stale local storage", () => {
   dom.window.__nativeSettings = { robotMuted: true };
   dom.window.eval(scriptMatch[1]);
   clickLabel(dom.window.document, "Settings");
-  assert.ok([...dom.window.document.querySelectorAll(".lbl")].some((e) => e.textContent === "Unmute robot"));
+  assert.ok([...dom.window.document.querySelectorAll(".lbl")].some((e) => e.textContent === "Unmute robot sounds"));
   dom.window.close();
 });
 

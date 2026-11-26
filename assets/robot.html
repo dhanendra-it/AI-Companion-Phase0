@@ -637,11 +637,11 @@ let autoResetTimer = null;
 let idleFidgetTimer = null;
 let audioCtx = null;
 // Sound on/off. Initial value is injected by the native app (before this script runs).
+// Two independent switches: the robot's own time-to-time sounds, and the scheduler reminder alarm.
 let robotMuted = window.__robotMuted === true;
-window.__setMuted = muted => {
-  robotMuted = muted === true;
-  if (robotMuted && audioCtx && audioCtx.state === "running") audioCtx.suspend().catch(() => {});
-};
+let reminderMuted = window.__reminderMuted === true;
+window.__setMuted = muted => { robotMuted = muted === true; };
+window.__setReminderMuted = muted => { reminderMuted = muted === true; };
 
 // The ordered emotional behavior cycle directly matching reference sprites
 const BEHAVIORS = [
@@ -656,8 +656,8 @@ const BEHAVIORS = [
 let currentBehaviorIndex = -1;
 
 // ================= PROCEDURAL AUDIO SYNTHESIZER =================
-function playRobotChime(mood) {
-  if (robotMuted) return;
+function playRobotChime(mood, isReminder) {
+  if (isReminder ? reminderMuted : robotMuted) return;
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -922,7 +922,7 @@ function scheduleShoeFidget() {
   }, delay);
 }
 // ================= GLOBAL DISPATCHER =================
-window.companionReact = (mood) => {
+window.companionReact = (mood, source) => {
   const allMoods = [
     "idle",
     "happy",
@@ -943,7 +943,7 @@ window.companionReact = (mood) => {
     eyeR.style.translate = "";
   }
 
-  playRobotChime(mood);
+  playRobotChime(mood, source === "reminder");
 
   if (autoResetTimer) clearTimeout(autoResetTimer);
 
@@ -951,7 +951,7 @@ window.companionReact = (mood) => {
   if (mood !== "idle" && mood !== "sleeping") {
     autoResetTimer = setTimeout(() => {
       if (companion.classList.contains(mood)) {
-        window.companionReact("idle");
+        window.companionReact("idle", source);
       }
     }, 3200);
   }
@@ -992,20 +992,20 @@ function startReminderAlarm() {
   stopReminderAlarm();
 
   if (companion.classList.contains("sleeping")) {
-    window.companionReact("idle");
+    window.companionReact("idle", "reminder");
   }
 
   // Start the reminder motion and beep immediately, then repeat each second for eight seconds.
-  window.companionReact("lightning");
+  window.companionReact("lightning", "reminder");
   reminderAlarmInterval = setInterval(() => {
-    window.companionReact("lightning");
+    window.companionReact("lightning", "reminder");
   }, 1000);
 
   // Return to idle after exactly 8 seconds
   reminderAlarmTimeout = setTimeout(() => {
     stopReminderAlarm();
     if (companion.classList.contains("lightning")) {
-      window.companionReact("idle");
+      window.companionReact("idle", "reminder");
     }
   }, 8000);
 }
@@ -1013,7 +1013,7 @@ function startReminderAlarm() {
 function hideReminder() {
   stopReminderAlarm();
   if (companion.classList.contains("lightning")) {
-    window.companionReact("idle");
+    window.companionReact("idle", "reminder");
   }
   if (reminderTimer) {
     clearTimeout(reminderTimer);

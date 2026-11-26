@@ -60,7 +60,9 @@ const ICONS={
  eyeOff:'<path d="m3 3 26 26M13.6 13.6a3.4 3.4 0 0 0 4.8 4.8"/><path d="M10.6 6.8A15 15 0 0 1 16 6c7 0 11 7 11 7a18 18 0 0 1-4 4.6M6.2 9.2C3.8 11 2 13 2 13s4 7 14 7c1.1 0 2.1-.1 3-.4"/>',
  plus:'<path d="M16 6v20M6 16h20"/>',
  volOn:'<path d="M5 12v8h5l7 5V7l-7 5z"/><path d="M21 11.5a6 6 0 0 1 0 9M24 8a10.5 10.5 0 0 1 0 16"/>',
- volOff:'<path d="M5 12v8h5l7 5V7l-7 5z"/><path d="m22 12 7 8M29 12l-7 8"/>'
+ volOff:'<path d="M5 12v8h5l7 5V7l-7 5z"/><path d="m22 12 7 8M29 12l-7 8"/>',
+ bell:'<path d="M8 21V14a8 8 0 0 1 16 0v7l2 3H6z"/><path d="M13 27a3 3 0 0 0 6 0"/>',
+ bellOff:'<path d="M8 21V14a8 8 0 0 1 12-6.9M24 14v7l2 3H6l2-3"/><path d="M13 27a3 3 0 0 0 6 0M4 4l24 24"/>'
 };
 const WM=[
   {icon:"robot",name:"Show / hide Aalu",target:"toggle-robot",kind:"action"},
@@ -75,9 +77,9 @@ let toastTimer=null;
 function notify(message,isError=false){toast.textContent=message;toast.className="toast show"+(isError?" error":"");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.className="toast",2600)}
 function sendNative(message){try{if(!window.ipc||typeof window.ipc.postMessage!=="function")throw new Error("Native toolbar bridge is unavailable");window.ipc.postMessage(typeof message==="string"?message:JSON.stringify(message));return true}catch(error){notify(error.message||"Could not send action to Aalu",true);return false}}
 
-function loadSettings(){const native=(window.__nativeSettings&&typeof window.__nativeSettings==="object")?window.__nativeSettings:{};try{const s=JSON.parse(localStorage.getItem(settingsKey)||"{}");return{showRobotInCapture:s.showRobotInCapture!==false,robotMuted:typeof native.robotMuted==="boolean"?native.robotMuted:s.robotMuted===true}}catch(e){return{showRobotInCapture:true,robotMuted:native.robotMuted===true}}}
-function persistSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(error){notify("Could not save settings in this WebView",true)}sendNative({t:"set-setting",robot_visible_in_capture:settings.showRobotInCapture,robot_muted:settings.robotMuted})}
-window.__setSettings=function(s){if(!s)return;let changed=false;if(typeof s.showRobotInCapture==="boolean"){settings.showRobotInCapture=s.showRobotInCapture;changed=true}if(typeof s.robotMuted==="boolean"){settings.robotMuted=s.robotMuted;changed=true}if(changed){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(e){}render()}};
+function loadSettings(){const native=(window.__nativeSettings&&typeof window.__nativeSettings==="object")?window.__nativeSettings:{};try{const s=JSON.parse(localStorage.getItem(settingsKey)||"{}");return{showRobotInCapture:s.showRobotInCapture!==false,robotMuted:typeof native.robotMuted==="boolean"?native.robotMuted:s.robotMuted===true,reminderMuted:typeof native.reminderMuted==="boolean"?native.reminderMuted:s.reminderMuted===true}}catch(e){return{showRobotInCapture:true,robotMuted:native.robotMuted===true,reminderMuted:native.reminderMuted===true}}}
+function persistSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(error){notify("Could not save settings in this WebView",true)}sendNative({t:"set-setting",robot_visible_in_capture:settings.showRobotInCapture,robot_muted:settings.robotMuted,reminder_muted:settings.reminderMuted})}
+window.__setSettings=function(s){if(!s)return;let changed=false;if(typeof s.showRobotInCapture==="boolean"){settings.showRobotInCapture=s.showRobotInCapture;changed=true}if(typeof s.robotMuted==="boolean"){settings.robotMuted=s.robotMuted;changed=true}if(typeof s.reminderMuted==="boolean"){settings.reminderMuted=s.reminderMuted;changed=true}if(changed){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(e){}render()}};
 
 function load(){try{const value=JSON.parse(localStorage.getItem(key)||"{}");if(!value||typeof value!=="object"||Array.isArray(value))return{};const clean={};for(const [name,items] of Object.entries(value)){if(Array.isArray(items))clean[name]=items.filter(x=>x&&typeof x.name==="string"&&typeof x.target==="string"&&typeof x.kind==="string")}return clean}catch{return{}}}
 function persist(){try{localStorage.setItem(key,JSON.stringify(data));return true}catch(error){notify("Could not save toolbar items. Check WebView storage permissions.",true);return false}}
@@ -114,10 +116,21 @@ function render(){clear();
   const muted=settings.robotMuted===true;
   slot(1,
     `<div class="ico"><div class="badge ${muted?'toggle-off':'toggle-on'}"><svg viewBox="0 0 32 32">${muted?ICONS.volOff:ICONS.volOn}</svg></div></div>`+
-    `<div class="lbl">${muted?'Unmute robot':'Mute robot'}</div>`+
-    `<div class="sublbl ${muted?'off':''}">${muted?'MUTED · tap to unmute':'SOUND ON · tap to mute'}</div>`,
+    `<div class="lbl">${muted?'Unmute robot sounds':'Mute robot sounds'}</div>`+
+    `<div class="sublbl ${muted?'off':''}">${muted?'MUTED · tap to unmute':'ON · tap to mute'}</div>`,
     ()=>{
       settings.robotMuted=!muted;
+      persistSettings();
+      render();
+    }
+  );
+  const remMuted=settings.reminderMuted===true;
+  slot(3,
+    `<div class="ico"><div class="badge ${remMuted?'toggle-off':'toggle-on'}"><svg viewBox="0 0 32 32">${remMuted?ICONS.bellOff:ICONS.bell}</svg></div></div>`+
+    `<div class="lbl">${remMuted?'Unmute reminder sound':'Mute reminder sound'}</div>`+
+    `<div class="sublbl ${remMuted?'off':''}">${remMuted?'MUTED · tap to unmute':'ON · tap to mute'}</div>`,
+    ()=>{
+      settings.reminderMuted=!remMuted;
       persistSettings();
       render();
     }
