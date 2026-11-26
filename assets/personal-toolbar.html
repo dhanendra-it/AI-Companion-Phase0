@@ -24,7 +24,7 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 .add .ico{border:1.5px dashed rgba(255,255,255,.28);font-size:24px;color:#c4c7d2}
 .modal{display:none;position:absolute;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:24px;z-index:5}.modal.open{display:flex}
 .dialog{width:100%;background:#1d1f27;border:1px solid #43485a;border-radius:20px;padding:18px;display:grid;gap:10px}.dialog h2{margin:0 0 2px;font-size:15px}
-.dialog input,.dialog select{background:#10121a;border:1px solid #393f52;color:#fff;padding:9px 11px;border-radius:10px;outline:none;font-size:13px;user-select:text}
+.dialog input,.dialog textarea,.dialog select{width:100%;background:#10121a;border:1px solid #393f52;color:#fff;padding:9px 11px;border-radius:10px;outline:none;font-size:13px;user-select:text}.dialog textarea{min-height:86px;resize:vertical;font:inherit;line-height:1.45}
 .pickrow{display:none;gap:8px}.pickrow button{flex:1;border:0;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:700;font-size:12px;background:#2b3242;color:#dce1ed}.pickrow button:hover{background:#37405a}
 .actions{display:flex;justify-content:flex-end;gap:8px}.actions button{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700}
 .primary{background:#7c8cff;color:#101321}.secondary{background:#2b3242;color:#dce1ed}
@@ -35,7 +35,7 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 <div class="panel" id="panel">
   <div class="center" id="center"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle">Add item</h2><input id="name" placeholder="Name"><input id="target" placeholder="URL, app path, or text"><div class="pickrow" id="pickRow"><button type="button" id="pickFile">Browse file / app</button><button type="button" id="pickFolder">Browse folder</button></div><select id="kind"><option value="url">Website / URL</option><option value="app">Desktop app / shortcut</option><option value="folder">Folder</option><option value="text">Text (copy to clipboard)</option></select><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Save</button></div></div></div>
+  <div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle">Add item</h2><input id="name" placeholder="Name"><textarea id="target" rows="3" placeholder="URL, app path, or text"></textarea><div class="pickrow" id="pickRow"><button type="button" id="pickFile">Browse file / app</button><button type="button" id="pickFolder">Browse folder</button></div><select id="kind"><option value="url">Website / URL</option><option value="app">Desktop app / shortcut</option><option value="folder">Folder</option><option value="text">Text (copy to clipboard)</option></select><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Save</button></div></div></div>
 </div>
 <script>
 // Slot centres as % of the 500x500 panel, clockwise from top-left (matches the reference layout).
@@ -83,7 +83,7 @@ function slot(i,html,onclick,extra){const[x,y]=SLOTS[i];const d=document.createE
 function sectionSlot(i,k,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+SVG[k]+'</svg><span class="chev">›</span></div><div class="lbl">'+label+'</div>',()=>{view=k;page=0;render()})}
 function badge(x){const el=document.createElement("div");el.className="badge";if(x.icon&&ICONS[x.icon]){el.style.background="rgba(255,255,255,.1)";el.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+ICONS[x.icon]+'</svg>'}else{const h=hue(x.name);el.style.background="linear-gradient(145deg,hsl("+h+" 70% 58%),hsl("+(h+40)+" 70% 38%))";el.textContent=(x.name[0]||"?").toUpperCase()}return el}
 function itemSlot(i,x,removable,idx,listKey){const d=slot(i,'<div class="ico"></div><div class="lbl"></div>',()=>activate(x));d.querySelector(".ico").append(badge(x));d.querySelector(".lbl").textContent=x.name;
- if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){data[listKey].splice(idx,1);persist();render()}}}
+ if(removable)d.oncontextmenu=e=>{e.preventDefault();if(confirm('Remove "'+x.name+'"?')){const removed=data[listKey].splice(idx,1)[0];if(!persist()){data[listKey].splice(idx,0,removed);return}render();notify("Removed "+x.name)}}}
 function addSlot(i,listKey,label){slot(i,'<div class="ico"><svg viewBox="0 0 32 32">'+ICONS.plus+'</svg></div><div class="lbl">'+label+'</div>',()=>openModal(listKey),' add')}
 
 function render(){clear();
@@ -129,14 +129,14 @@ function activate(x){
 let addTo=null;
 function openModal(listKey){addTo=listKey;const k=document.getElementById("kind");document.getElementById("name").value="";document.getElementById("target").value="";
  k.value=listKey==="Apps"||listKey==="Shortcuts"?"app":listKey==="Folders"?"folder":listKey==="Commands"?"text":"url";syncPick();document.getElementById("modal").classList.add("open");document.getElementById("name").focus()}
-function syncPick(){const kind=document.getElementById("kind").value;document.getElementById("pickRow").style.display=kind==="app"||kind==="folder"?"flex":"none";document.getElementById("pickFile").style.display=kind==="folder"?"none":"block";document.getElementById("pickFolder").style.display=kind==="folder"?"block":"none"}
+function syncPick(){const kind=document.getElementById("kind").value;document.getElementById("pickRow").style.display=kind==="app"||kind==="folder"?"flex":"none";document.getElementById("pickFile").style.display=kind==="folder"?"none":"block";document.getElementById("pickFolder").style.display=kind==="folder"?"block":"none";document.getElementById("target").placeholder=kind==="text"?"Text to copy (multiple lines supported)":kind==="url"?"Website URL or domain":"Application path or folder path"}
 document.getElementById("kind").onchange=syncPick;
 document.getElementById("pickFile").onclick=()=>{pendingPickMode="app";sendNative({t:"pick",mode:"file"})};
 document.getElementById("pickFolder").onclick=()=>{pendingPickMode="folder";sendNative({t:"pick",mode:"folder"})};
 window.__picked=p=>{if(!p)return;if(p.startsWith("__AALU_ERROR__")){notify(p.slice(14),true);return}document.getElementById("target").value=p;document.getElementById("kind").value=pendingPickMode;syncPick();const n=document.getElementById("name");if(!n.value.trim()){const base=p.replace(/[\\/]+$/,"").split(/[\\/]/).pop()||p;n.value=pendingPickMode==="app"?base.replace(/\.[^.]+$/,""):base}notify("Selected "+p.split(/[\\/]/).pop())};
 window.__actionResult=(ok,message,closeAfter)=>{notify(message|| (ok?"Done":"Action failed"),!ok);if(ok&&closeAfter)setTimeout(()=>sendNative("close"),650)};
 document.getElementById("cancel").onclick=()=>document.getElementById("modal").classList.remove("open");
-document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),target=document.getElementById("target").value.trim(),kind=document.getElementById("kind").value;if(!name||!target){notify("Enter both a name and a target",true);return}if(kind==="url"){let url=target;if(!/^https?:\/\//i.test(url))url="https://"+url;try{new URL(url)}catch{notify("Enter a valid website address",true);return}}if(!Array.isArray(data[addTo]))data[addTo]=[];data[addTo].push({name,target,kind});if(!persist())return;document.getElementById("modal").classList.remove("open");render();notify("Added "+name)};
+document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),rawTarget=document.getElementById("target").value,kind=document.getElementById("kind").value,target=kind==="text"?rawTarget:rawTarget.trim();if(!name||!target.trim()){notify("Enter both a name and a target",true);return}if(kind==="url"){let url=target;if(!/^https?:\/\//i.test(url))url="https://"+url;try{new URL(url)}catch{notify("Enter a valid website address",true);return}}if(!Array.isArray(data[addTo]))data[addTo]=[];data[addTo].push({name,target,kind});if(!persist())return;document.getElementById("modal").classList.remove("open");render();notify("Added "+name)};
 center.onclick=()=>{if(view===null)sendNative("close");else{view=null;render()}};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(document.getElementById("modal").classList.contains("open"))document.getElementById("modal").classList.remove("open");else if(view!==null){view=null;render()}else sendNative("close")}});
 // Click on empty space (anything that is not a slot, the centre, or the add dialog) closes the toolbar.
