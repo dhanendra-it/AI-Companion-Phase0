@@ -36,6 +36,12 @@ jobs:
           Set-Content -Path $scriptPath -Value $match.Groups[1].Value -Encoding utf8
           node --check $scriptPath
 
+      - name: Install toolbar test dependency
+        run: npm install --no-save --no-package-lock jsdom@26
+
+      - name: Run Personal Toolbar interaction tests
+        run: node --test tests/personal-toolbar.test.cjs
+
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
