@@ -32,6 +32,10 @@ function boot() {
 
 test("checklist tab shows today's blocks and ticking one saves it", () => {
   const app = boot();
+  // Checklist is the default tab; switching away and back must work too.
+  assert.equal(app.document.getElementById("checkView").classList.contains("view-hidden"), false);
+  app.document.getElementById("tabPlan").click();
+  assert.equal(app.document.getElementById("checkView").classList.contains("view-hidden"), true);
   app.document.getElementById("tabCheck").click();
   assert.equal(app.document.getElementById("checkView").classList.contains("view-hidden"), false);
   assert.equal(app.document.getElementById("planView").classList.contains("view-hidden"), true);
@@ -44,7 +48,7 @@ test("checklist tab shows today's blocks and ticking one saves it", () => {
   assert.deepEqual(msg, { t: "check", date: keyOf(new Date()), id: "b1", done: true });
   assert.match(app.document.getElementById("checkCount").textContent, /1 \/ 2 done/);
   assert.ok(app.document.querySelector(".check-row.done"));
-  assert.equal(app.document.getElementById("progressFill").style.width, "50%");
+  assert.equal(app.document.getElementById("progressFill").style.getPropertyValue("--p"), "50");
 
   app.document.querySelector(".check-row.done").click();
   assert.equal(app.messages.filter((m) => m.t === "check").at(-1).done, false);

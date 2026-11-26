@@ -416,6 +416,180 @@ select:focus, input:focus {
 .hist-chip.full b { color: #5dd8c0; }
 .hist-chip b { display: block; font-size: 11.5px; color: #c4d2de; }
 
+
+/* ================= Premium theme ================= */
+:root {
+  --glow: 0 0 0 1px rgba(93,216,192,.18), 0 8px 28px rgba(0,0,0,.35);
+  --card: linear-gradient(160deg, #1b2733 0%, #16202a 100%);
+  --card-border: rgba(255,255,255,.07);
+}
+body {
+  background:
+    radial-gradient(900px 420px at 85% -10%, rgba(72,203,178,.10), transparent 60%),
+    radial-gradient(700px 400px at -10% 110%, rgba(99,132,255,.07), transparent 60%),
+    #0f151c;
+}
+.window-bar {
+  background: linear-gradient(180deg, rgba(27,37,48,.95), rgba(19,27,36,.95));
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  box-shadow: 0 1px 0 rgba(0,0,0,.4);
+}
+.badge {
+  background: linear-gradient(135deg, #7be8d3, #3fb9a3);
+  box-shadow: 0 4px 14px rgba(72,203,178,.35);
+}
+.brand h1 { letter-spacing: .01em; }
+
+/* Segmented tabs */
+.tabs {
+  gap: 4px;
+  padding: 10px 14px;
+  background: transparent;
+  border-bottom: 0;
+}
+.tab {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 7px 18px;
+  font-size: 12.5px;
+  letter-spacing: .02em;
+  transition: all .18s ease;
+}
+.tab:hover { background: rgba(255,255,255,.05); color: #e4ebf2; }
+.tab.active {
+  color: #07221d;
+  background: linear-gradient(135deg, #6fe3cc, #43bca6);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(72,203,178,.30);
+}
+
+/* Panes / cards */
+.main-content { background: transparent; gap: 12px; padding: 0 14px 12px; }
+.pane {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--glow);
+}
+.block-list-container, .check-list {
+  background: rgba(10,15,21,.45);
+  border: 1px solid rgba(255,255,255,.05);
+  border-radius: 12px;
+}
+.block-row, .day-card {
+  background: linear-gradient(160deg, #1d2935, #18222c);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 10px;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.block-row:hover, .day-card:hover { transform: translateY(-1px); border-color: rgba(93,216,192,.35); box-shadow: 0 6px 16px rgba(0,0,0,.3); }
+.day-card.today { border-color: rgba(93,216,192,.55); background: linear-gradient(160deg, #1a3a38, #17282b); }
+.block-time {
+  background: linear-gradient(135deg, rgba(93,216,192,.18), rgba(93,216,192,.08));
+  border: 1px solid rgba(93,216,192,.28);
+  border-radius: 7px;
+  font-variant-numeric: tabular-nums;
+}
+.btn-sm, .btn-add { border-radius: 9px; transition: all .15s ease; }
+.btn-save {
+  background: linear-gradient(135deg, #6fe3cc, #43bca6);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(72,203,178,.30);
+}
+.btn-save:hover { filter: brightness(1.06); }
+.footer-bar { background: rgba(15,21,28,.9); border-top: 1px solid rgba(255,255,255,.06); }
+
+/* Checklist */
+.check-view { background: transparent; padding: 2px 16px 14px; gap: 12px; }
+.date-nav {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 8px 10px;
+  box-shadow: var(--glow);
+}
+.date-label { font-size: 14.5px; letter-spacing: .01em; }
+.date-nav .btn-sm { width: 34px; height: 30px; padding: 0; font-size: 16px; line-height: 1; border-radius: 9px; }
+.date-nav #dateToday { width: auto; padding: 0 14px; font-size: 11.5px; }
+
+.summary-card {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--glow);
+}
+.ring {
+  --p: 0;
+  width: 58px;
+  height: 58px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: conic-gradient(#5dd8c0 calc(var(--p) * 1%), #26333f 0);
+  filter: drop-shadow(0 0 10px rgba(93,216,192,.25));
+  transition: background .3s ease;
+}
+.ring::before { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #17212b; }
+.ring span { position: relative; font-size: 13px; font-weight: 800; color: #e8fbf6; font-variant-numeric: tabular-nums; }
+.summary-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.summary-title { font-size: 14px; font-weight: 700; color: #edf3f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.summary-sub { font-size: 12px; color: #93a4b3; }
+.summary-sub b { color: #5dd8c0; font-weight: 800; }
+
+.check-list { padding: 10px; gap: 7px; }
+.check-row {
+  padding: 10px 12px;
+  background: linear-gradient(160deg, #1d2935, #18222c);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  gap: 12px;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .2s ease;
+}
+.check-row:hover { transform: translateY(-1px); border-color: rgba(93,216,192,.4); box-shadow: 0 8px 20px rgba(0,0,0,.32); }
+.check-row:active { transform: scale(.995); }
+.check-box {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #52687b;
+  border-radius: 50%;
+  font-size: 13px;
+  transition: all .18s cubic-bezier(.3,1.6,.5,1);
+}
+.check-row:hover .check-box { border-color: #5dd8c0; }
+.check-row.done {
+  background: linear-gradient(160deg, rgba(40,92,82,.30), rgba(24,34,44,.9));
+  border-color: rgba(93,216,192,.25);
+}
+.check-row.done .check-box {
+  background: linear-gradient(135deg, #7be8d3, #43bca6);
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(93,216,192,.5);
+  transform: scale(1.06);
+}
+.check-row .block-text { font-size: 13.5px; font-weight: 550; }
+
+.history { gap: 6px; }
+.hist-chip {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 6px 2px;
+  transition: all .15s ease;
+}
+.hist-chip:hover { transform: translateY(-1px); border-color: rgba(93,216,192,.4); }
+.hist-chip.active { background: linear-gradient(160deg, rgba(40,92,82,.45), #17282b); border-color: rgba(93,216,192,.6); box-shadow: 0 4px 14px rgba(72,203,178,.18); }
+.hist-chip.full b { color: #7be8d3; }
+
+.empty-state { color: #8a9cab; font-size: 12.5px; line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
 /* Modal Confirmation */
 .modal-overlay {
   position: fixed;
@@ -473,28 +647,31 @@ select:focus, input:focus {
 
 <!-- Tabs -->
 <nav class="tabs">
-  <button class="tab active" id="tabPlan" type="button">Timetable</button>
-  <button class="tab" id="tabCheck" type="button">Checklist</button>
+  <button class="tab active" id="tabCheck" type="button">Checklist</button>
+  <button class="tab" id="tabPlan" type="button">Timetable</button>
 </nav>
 
 <!-- Daily Checklist -->
-<main class="check-view view-hidden" id="checkView">
+<main class="check-view" id="checkView">
   <div class="date-nav">
     <button class="btn-sm" id="datePrev" title="Previous day" aria-label="Previous day">‹</button>
     <div class="date-label" id="dateLabel"></div>
     <button class="btn-sm" id="dateNext" title="Next day" aria-label="Next day">›</button>
     <button class="btn-sm" id="dateToday" title="Jump to today">Today</button>
   </div>
-  <div class="progress-row">
-    <div class="progress-meta"><span id="checkTplName"></span><span id="checkCount"></span></div>
-    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="summary-card">
+    <div class="ring" id="progressFill" style="--p:0"><span id="ringPct">0%</span></div>
+    <div class="summary-copy">
+      <div class="summary-title" id="checkTplName"></div>
+      <div class="summary-sub" id="checkCount"></div>
+    </div>
   </div>
   <div class="check-list" id="checkList"></div>
   <div class="history" id="history"></div>
 </main>
 
 <!-- Main 2-Column Area -->
-<main class="main-content" id="planView">
+<main class="main-content view-hidden" id="planView">
   <!-- Left Column: Templates & Schedule Blocks -->
   <section class="pane">
     <div class="pane-title-row">
@@ -541,7 +718,7 @@ select:focus, input:focus {
 <!-- Footer Action Bar -->
 <footer class="footer-bar">
   <div class="status-msg" id="statusMsg">Loading schedule…</div>
-  <button class="btn-save" id="btnSave">Save Schedule</button>
+  <button class="btn-save view-hidden" id="btnSave">Save Schedule</button>
 </footer>
 
 <!-- Modal Prompt / Confirm -->
@@ -585,7 +762,7 @@ let schedule = {
   done: {}
 };
 let activeTemplateId = null;
-let activeTab = 'plan';
+let activeTab = 'check';
 let checkDate = null; // 'YYYY-MM-DD' shown in the checklist; null = today
 
 const DAYS = [
@@ -916,6 +1093,11 @@ const checkTplName = document.getElementById('checkTplName');
 const checkCount = document.getElementById('checkCount');
 const progressFill = document.getElementById('progressFill');
 const historyEl = document.getElementById('history');
+const ringPct = document.getElementById('ringPct');
+function setProgress(p) {
+  progressFill.style.setProperty('--p', p);
+  ringPct.textContent = p + '%';
+}
 
 function templateForDate(date) {
   const day = DAYS.find(x => x.idx === date.getDay());
@@ -963,7 +1145,7 @@ function renderChecklist() {
     const dayName = DAYS.find(x => x.idx === date.getDay()).name;
     checkTplName.textContent = 'No template';
     checkCount.textContent = '';
-    progressFill.style.width = '0%';
+    setProgress(0);
     const empty = document.createElement('div');
     empty.className = 'empty-state';
     empty.textContent = `No template is assigned to ${dayName}. Assign one in the Timetable tab (Week Plan).`;
@@ -971,7 +1153,7 @@ function renderChecklist() {
   } else if (!tpl.blocks.length) {
     checkTplName.textContent = tpl.name;
     checkCount.textContent = '0 / 0 done';
-    progressFill.style.width = '0%';
+    setProgress(0);
     const empty = document.createElement('div');
     empty.className = 'empty-state';
     empty.textContent = `"${tpl.name}" has no blocks yet. Add some in the Timetable tab.`;
@@ -981,10 +1163,14 @@ function renderChecklist() {
     const done = blocks.filter(b => isDone(key, b.id)).length;
     checkTplName.textContent = tpl.name;
     checkCount.textContent = '';
-    const strong = document.createElement('b');
-    strong.textContent = `${done} / ${blocks.length}`;
-    checkCount.append(strong, ' done');
-    progressFill.style.width = `${Math.round((done / blocks.length) * 100)}%`;
+    if (done === blocks.length) {
+      checkCount.append('All done \u2728 Great job!');
+    } else {
+      const strong = document.createElement('b');
+      strong.textContent = `${done} / ${blocks.length}`;
+      checkCount.append(strong, ' done');
+    }
+    setProgress(Math.round((done / blocks.length) * 100));
 
     for (const b of blocks) {
       const checked = isDone(key, b.id);
