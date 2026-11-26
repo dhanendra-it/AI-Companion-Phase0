@@ -119,10 +119,28 @@ extern "system" {
     fn GetCursorPos(point: *mut NativePoint) -> i32;
     fn GetForegroundWindow() -> *mut c_void;
     fn SetWindowDisplayAffinity(hwnd: *mut c_void, affinity: u32) -> i32;
+    fn OpenClipboard(hwnd: *mut c_void) -> i32;
+    fn EmptyClipboard() -> i32;
+    fn SetClipboardData(format: u32, memory: *mut c_void) -> *mut c_void;
+    fn CloseClipboard() -> i32;
 }
 
 const WDA_NONE: u32 = 0x0;
 const WDA_EXCLUDEFROMCAPTURE: u32 = 0x11;
+const CF_UNICODETEXT: u32 = 13;
+const GMEM_MOVEABLE: u32 = 0x0002;
+
+#[link(name = "shell32")]
+extern "system" {
+    fn ShellExecuteW(
+        hwnd: *mut c_void,
+        operation: *const u16,
+        file: *const u16,
+        parameters: *const u16,
+        directory: *const u16,
+        show_command: i32,
+    ) -> *mut c_void;
+}
 
 /// True when the mouse cursor is inside the window's outer rectangle.
 fn cursor_over_window(window: &Window) -> bool {
@@ -147,6 +165,10 @@ extern "system" {
     fn CreateMutexW(attributes: *mut c_void, initial_owner: i32, name: *const u16) -> *mut c_void;
     fn GetLastError() -> u32;
     fn CloseHandle(handle: *mut c_void) -> i32;
+    fn GlobalAlloc(flags: u32, bytes: usize) -> *mut c_void;
+    fn GlobalLock(memory: *mut c_void) -> *mut c_void;
+    fn GlobalUnlock(memory: *mut c_void) -> i32;
+    fn GlobalFree(memory: *mut c_void) -> *mut c_void;
 }
 
 /// Keep one Aalu process per Windows session so global hotkeys and input hooks cannot compete.
@@ -164,6 +186,70 @@ fn acquire_single_instance() -> bool {
         }
         // Intentionally keep this handle open until process exit.
         true
+    }
+}
+
+/// Open a file, folder, application shortcut, or URL through the Windows Shell.
+/// ShellExecuteW correctly handles .lnk files, executables, folders and web URLs.
+fn shell_open(target: &str) -> Result<(), String> {
+    let target = target.trim();
+    if target.is_empty() { return Err("No target was provided".into()); }
+    let operation: Vec<u16> = "open\0".encode_utf16().collect();
+    let target: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(), operation.as_ptr(), target.as_ptr(),
+            std::ptr::null(), std::ptr::null(), 1,
+        )
+    };
+    let code = result as isize;
+    if code <= 32 { Err(format!("Windows could not open this item (ShellExecute code {code})")) }
+    else { Ok(()) }
+}
+
+/// Write Unicode text directly to the Windows clipboard (CF_UNICODETEXT).
+fn set_clipboard_text(text: &str) -> Result<(), String> {
+    let clean = text.replace('\0', "�");
+    let wide: Vec<u16> = clean.encode_utf16().chain(std::iter::once(0)).collect();
+    let bytes = wide.len() * std::mem::size_of::<u16>();
+    unsafe {
+        let memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if memory.is_null() { return Err("Could not allocate clipboard memory".into()); }
+        let destination = GlobalLock(memory) as *mut u16;
+        if destination.is_null() {
+            GlobalFree(memory);
+            return Err("Could not lock clipboard memory".into());
+        }
+        std::ptr::copy_nonoverlapping(wide.as_ptr(), destination, wide.len());
+        GlobalUnlock(memory);
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            GlobalFree(memory);
+            return Err("Windows clipboard is busy; try again".into());
+        }
+        if EmptyClipboard() == 0 {
+            CloseClipboard();
+            GlobalFree(memory);
+            return Err("Could not clear the Windows clipboard".into());
+        }
+        if SetClipboardData(CF_UNICODETEXT, memory).is_null() {
+            CloseClipboard();
+            GlobalFree(memory);
+            return Err("Could not write text to the Windows clipboard".into());
+        }
+        // Windows owns the movable memory after SetClipboardData succeeds.
+        CloseClipboard();
+    }
+    Ok(())
+}
+
+fn notify_toolbar_action(webview_slot: &Option<WebView>, result: Result<(), String>, success_message: &str, close_after: bool) {
+    let (ok, message) = match result {
+        Ok(()) => (true, success_message.to_string()),
+        Err(error) => (false, error),
+    };
+    let message = serde_json::to_string(&message).unwrap_or_else(|_| "\"Toolbar action failed\"".into());
+    if let Some(view) = webview_slot.as_ref() {
+        let _ = view.evaluate_script(&format!("window.__actionResult && window.__actionResult({ok}, {message}, {close_after})"));
     }
 }
 
@@ -469,8 +555,15 @@ fn main() -> wry::Result<()> {
                     }
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
-                        Some("open-url") if target.starts_with("https://") || target.starts_with("http://") => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
-                        Some("launch-app") if !target.trim().is_empty() => { let _ = Command::new("explorer.exe").arg(target).spawn(); }
+                        Some("open-url") if target.starts_with("https://") || target.starts_with("http://") => {
+                            notify_toolbar_action(&toolbar_webview, shell_open(target), "Opened website", true);
+                        }
+                        Some("open-url") => notify_toolbar_action(&toolbar_webview, Err("Only http:// and https:// website addresses are supported".into()), "", false),
+                        Some("launch-app") if !target.trim().is_empty() => {
+                            notify_toolbar_action(&toolbar_webview, shell_open(target), "Opened item", true);
+                        }
+                        Some("launch-app") => notify_toolbar_action(&toolbar_webview, Err("Choose an application, shortcut or folder first".into()), "", false),
+                        Some("copy-text") => notify_toolbar_action(&toolbar_webview, set_clipboard_text(target), "Copied to clipboard", false),
                         Some("pick") => {
                             toolbar_picking = true;
                             pick_path(msg.get("mode").and_then(|v| v.as_str()).unwrap_or("file"), proxy.clone());
@@ -1336,7 +1429,15 @@ fn toggle_toolbar(
     center_toolbar(target, &window);
     let toolbar_proxy = proxy.clone();
     match WebViewBuilder::new()
-        .with_html(PERSONAL_TOOLBAR_HTML)
+        // A named secure origin is required for WebView2 localStorage persistence.
+        .with_https_scheme(true)
+        .with_custom_protocol("aalu".into(), |_webview_id, _request| {
+            wry::http::Response::builder()
+                .header("Content-Type", "text/html; charset=utf-8")
+                .body(Cow::Borrowed(PERSONAL_TOOLBAR_HTML.as_bytes()))
+                .expect("valid embedded toolbar response")
+        })
+        .with_url("aalu://toolbar/index.html")
         .with_transparent(true)
         .with_ipc_handler(move |request| { let _ = toolbar_proxy.send_event(AppEvent::ToolbarMessage(request.body().clone())); })
         .build(&window)
