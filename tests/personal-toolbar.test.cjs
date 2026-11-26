@@ -93,6 +93,30 @@ test("folder picker requests folder mode and launches the selected folder", () =
   app.dom.window.close();
 });
 
+test("pinned apps launch through the native shell bridge", () => {
+  const app = boot();
+  clickLabel(app.document, "Add app");
+  app.document.getElementById("name").value = "Notepad";
+  app.document.getElementById("target").value = "C:\\Windows\\System32\\notepad.exe";
+  app.document.getElementById("kind").value = "app";
+  app.document.getElementById("save").click();
+  clickLabel(app.document, "Notepad");
+  const launch = app.messages.map((x) => { try { return JSON.parse(x); } catch { return x; } })
+    .find((x) => x && x.t === "launch-app");
+  assert.equal(launch.target, "C:\\Windows\\System32\\notepad.exe");
+  app.dom.window.close();
+});
+
+test("screenshot exclusion toggle synchronizes with the native setting", () => {
+  const app = boot();
+  clickLabel(app.document, "Settings");
+  app.document.querySelector(".slot").click();
+  const setting = app.messages.map((x) => { try { return JSON.parse(x); } catch { return x; } })
+    .filter((x) => x && x.t === "set-setting").at(-1);
+  assert.equal(setting.hide_on_capture, false);
+  app.dom.window.close();
+});
+
 test("Settings opens Window Manager and its actions reach the native bridge", () => {
   const app = boot();
   clickLabel(app.document, "Settings");
