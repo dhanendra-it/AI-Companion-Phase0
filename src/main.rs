@@ -192,7 +192,7 @@ fn acquire_single_instance() -> bool {
 /// Open a file, folder, application shortcut, or URL through the Windows Shell.
 /// ShellExecuteW correctly handles .lnk files, executables, folders and web URLs.
 fn shell_open(target: &str) -> Result<(), String> {
-    let target = target.trim();
+    let target = target.trim().trim_matches('"');
     if target.is_empty() { return Err("No target was provided".into()); }
     let operation: Vec<u16> = "open\0".encode_utf16().collect();
     let target: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
@@ -555,7 +555,7 @@ fn main() -> wry::Result<()> {
                     }
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
-                        Some("open-url") if target.starts_with("https://") || target.starts_with("http://") => {
+                        Some("open-url") if target.to_ascii_lowercase().starts_with("https://") || target.to_ascii_lowercase().starts_with("http://") => {
                             notify_toolbar_action(&toolbar_webview, shell_open(target), "Opened website", true);
                         }
                         Some("open-url") => notify_toolbar_action(&toolbar_webview, Err("Only http:// and https:// website addresses are supported".into()), "", false),
