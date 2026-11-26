@@ -40,7 +40,7 @@ jobs:
         run: npm install --no-save --no-package-lock jsdom@26
 
       - name: Run Personal Toolbar interaction tests
-        run: node --test tests/personal-toolbar.test.cjs
+        run: node --test tests/personal-toolbar.test.cjs tests/scheduler-checklist.test.cjs
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2

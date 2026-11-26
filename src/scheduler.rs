@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     path::PathBuf,
     sync::{Arc, Condvar, Mutex},
     time::Duration,
@@ -16,6 +17,9 @@ pub struct Schedule {
     pub templates: Vec<Template>,
     #[serde(default)]
     pub week: WeekPlan,
+    /// Daily checklist state: local date ("YYYY-MM-DD") -> ids of blocks marked done that day.
+    #[serde(default)]
+    pub done: BTreeMap<String, Vec<String>>,
 }
 
 fn default_version() -> u32 {
@@ -28,8 +32,48 @@ impl Default for Schedule {
             version: 1,
             templates: Vec::new(),
             week: WeekPlan::default(),
+            done: BTreeMap::new(),
         }
     }
+}
+
+/// How many days of checklist history are kept.
+const MAX_DONE_DAYS: usize = 90;
+
+fn is_valid_date_key(s: &str) -> bool {
+    let b = s.as_bytes();
+    if b.len() != 10 || b[4] != b'-' || b[7] != b'-' {
+        return false;
+    }
+    let digits_ok = b
+        .iter()
+        .enumerate()
+        .all(|(i, c)| i == 4 || i == 7 || c.is_ascii_digit());
+    if !digits_ok {
+        return false;
+    }
+    let month: u16 = s[5..7].parse().unwrap_or(0);
+    let day: u16 = s[8..10].parse().unwrap_or(0);
+    (1..=12).contains(&month) && (1..=31).contains(&day)
+}
+
+/// Marks one block done/undone for a given date. Returns false if the date or id is invalid.
+pub fn set_block_done(schedule: &mut Schedule, date: &str, block_id: &str, done: bool) -> bool {
+    if !is_valid_date_key(date) || block_id.is_empty() || block_id.len() > 64 {
+        return false;
+    }
+    if done {
+        let ids = schedule.done.entry(date.to_string()).or_default();
+        if !ids.iter().any(|id| id == block_id) {
+            ids.push(block_id.to_string());
+        }
+    } else if let Some(ids) = schedule.done.get_mut(date) {
+        ids.retain(|id| id != block_id);
+        if ids.is_empty() {
+            schedule.done.remove(date);
+        }
+    }
+    true
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -153,6 +197,20 @@ pub fn validate(schedule: &mut Schedule) {
     check_ref(&mut schedule.week.fri);
     check_ref(&mut schedule.week.sat);
     check_ref(&mut schedule.week.sun);
+
+    // Checklist state: drop malformed dates/ids, dedupe, and keep only recent history.
+    schedule.done.retain(|date, _| is_valid_date_key(date));
+    for ids in schedule.done.values_mut() {
+        ids.retain(|id| !id.is_empty() && id.len() <= 64);
+        ids.sort();
+        ids.dedup();
+        ids.truncate(100);
+    }
+    schedule.done.retain(|_, ids| !ids.is_empty());
+    while schedule.done.len() > MAX_DONE_DAYS {
+        let Some(oldest) = schedule.done.keys().next().cloned() else { break };
+        schedule.done.remove(&oldest);
+    }
 }
 
 pub fn schedule_path() -> Option<PathBuf> {
@@ -471,6 +529,7 @@ mod tests {
                 sat: Some("t1".into()),
                 sun: Some("t2".into()),
             },
+            done: BTreeMap::new(),
         }
     }
 
@@ -617,6 +676,7 @@ mod tests {
                 tue: Some("non_existent".into()),
                 ..Default::default()
             },
+            done: BTreeMap::new(),
         };
 
         validate(&mut sched);
@@ -629,6 +689,49 @@ mod tests {
         // invalid week references are pruned
         assert_eq!(sched.week.mon, Some("t_valid".into()));
         assert_eq!(sched.week.tue, None);
+    }
+
+    #[test]
+    fn test_checklist_toggle_and_validation() {
+        let mut sched = sample_schedule();
+        assert!(set_block_done(&mut sched, "2026-11-27", "b1", true));
+        assert!(set_block_done(&mut sched, "2026-11-27", "b1", true)); // idempotent
+        assert!(set_block_done(&mut sched, "2026-11-27", "b2", true));
+        assert_eq!(sched.done["2026-11-27"], vec!["b1", "b2"]);
+
+        assert!(set_block_done(&mut sched, "2026-11-27", "b1", false));
+        assert_eq!(sched.done["2026-11-27"], vec!["b2"]);
+        assert!(set_block_done(&mut sched, "2026-11-27", "b2", false));
+        assert!(!sched.done.contains_key("2026-11-27"), "empty days are removed");
+
+        assert!(!set_block_done(&mut sched, "27-11-2026", "b1", true));
+        assert!(!set_block_done(&mut sched, "2026-13-01", "b1", true));
+        assert!(!set_block_done(&mut sched, "2026-11-27", "", true));
+    }
+
+    #[test]
+    fn test_checklist_old_history_is_pruned_and_garbage_dropped() {
+        let mut sched = sample_schedule();
+        for i in 0..120u32 {
+            let month = 1 + (i / 28) as u16;
+            let day = 1 + (i % 28) as u16;
+            sched.done.insert(format!("2026-{month:02}-{day:02}"), vec!["b1".into()]);
+        }
+        sched.done.insert("garbage".into(), vec!["b1".into()]);
+        sched.done.insert("2026-02-02".into(), vec!["x".into(), "x".into()]);
+        validate(&mut sched);
+        assert!(sched.done.len() <= MAX_DONE_DAYS);
+        assert!(!sched.done.contains_key("garbage"));
+        // oldest dates are the ones dropped
+        assert!(!sched.done.contains_key("2026-01-01"));
+        assert!(sched.done.contains_key("2026-05-08"), "newest date is kept");
+    }
+
+    #[test]
+    fn test_old_schedule_json_without_done_still_loads() {
+        let text = r#"{"version":1,"templates":[{"id":"t1","name":"A","blocks":[]}],"week":{"mon":"t1"}}"#;
+        let sched: Schedule = serde_json::from_str(text).unwrap();
+        assert!(sched.done.is_empty());
     }
 
     #[test]

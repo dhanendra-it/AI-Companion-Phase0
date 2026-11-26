@@ -355,6 +355,67 @@ select:focus, input:focus {
 .btn-save:hover { background: #56d1ba; }
 .btn-save:active { transform: translateY(1px); }
 
+
+/* Tabs */
+.tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 8px 14px 0;
+  background: #151d25;
+  border-bottom: 1px solid #2a3540;
+}
+.tab {
+  border: 0;
+  background: transparent;
+  color: #8fa0af;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  padding: 7px 14px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab:hover { color: #e4ebf2; background: #1b2631; }
+.tab.active { color: #5dd8c0; border-bottom-color: #5dd8c0; background: #18222c; }
+.view-hidden { display: none !important; }
+
+/* Checklist view */
+.check-view {
+  flex: 1;
+  min-height: 0;
+  background: #111820;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+.date-nav { display: flex; align-items: center; gap: 8px; flex: none; }
+.date-label { flex: 1; text-align: center; font-size: 14px; font-weight: 700; color: #edf3f8; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.date-nav .btn-sm { padding: 5px 12px; font-size: 13px; }
+.progress-row { flex: none; display: flex; flex-direction: column; gap: 5px; }
+.progress-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #93a4b3; }
+.progress-meta b { color: #5dd8c0; font-weight: 700; }
+.progress-bar { height: 7px; background: #1c2732; border: 1px solid #283644; border-radius: 6px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, #43bca6, #5dd8c0); transition: width .2s; }
+.check-list { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid #273441; border-radius: 10px; background: #141c24; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.check-list::-webkit-scrollbar { width: 6px; }
+.check-list::-webkit-scrollbar-thumb { background: #2b3947; border-radius: 3px; }
+.check-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: #19232d; border: 1px solid #283644; border-radius: 7px; cursor: pointer; transition: background .12s; }
+.check-row:hover { background: #1e2b37; border-color: #384a5b; }
+.check-box { width: 18px; height: 18px; flex: none; border: 2px solid #4a5f72; border-radius: 5px; display: grid; place-items: center; color: transparent; font-size: 12px; font-weight: 800; line-height: 1; transition: all .12s; }
+.check-row.done .check-box { background: #43bca6; border-color: #43bca6; color: #07221d; }
+.check-row.done .block-text { color: #7d8f9f; text-decoration: line-through; }
+.check-row.done .block-time { opacity: .55; }
+.history { flex: none; display: flex; gap: 5px; }
+.hist-chip { flex: 1; min-width: 0; border: 1px solid #283644; background: #17212b; color: #93a4b3; border-radius: 7px; padding: 4px 2px; font: inherit; font-size: 10.5px; line-height: 1.3; text-align: center; cursor: pointer; }
+.hist-chip:hover { border-color: #465a6c; color: #e4ebf2; }
+.hist-chip.active { border-color: #3b7d72; background: #17282b; color: #e4ebf2; }
+.hist-chip.full b { color: #5dd8c0; }
+.hist-chip b { display: block; font-size: 11.5px; color: #c4d2de; }
+
 /* Modal Confirmation */
 .modal-overlay {
   position: fixed;
@@ -410,8 +471,30 @@ select:focus, input:focus {
   </div>
 </div>
 
+<!-- Tabs -->
+<nav class="tabs">
+  <button class="tab active" id="tabPlan" type="button">Timetable</button>
+  <button class="tab" id="tabCheck" type="button">Checklist</button>
+</nav>
+
+<!-- Daily Checklist -->
+<main class="check-view view-hidden" id="checkView">
+  <div class="date-nav">
+    <button class="btn-sm" id="datePrev" title="Previous day" aria-label="Previous day">‹</button>
+    <div class="date-label" id="dateLabel"></div>
+    <button class="btn-sm" id="dateNext" title="Next day" aria-label="Next day">›</button>
+    <button class="btn-sm" id="dateToday" title="Jump to today">Today</button>
+  </div>
+  <div class="progress-row">
+    <div class="progress-meta"><span id="checkTplName"></span><span id="checkCount"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+  <div class="check-list" id="checkList"></div>
+  <div class="history" id="history"></div>
+</main>
+
 <!-- Main 2-Column Area -->
-<main class="main-content">
+<main class="main-content" id="planView">
   <!-- Left Column: Templates & Schedule Blocks -->
   <section class="pane">
     <div class="pane-title-row">
@@ -498,9 +581,12 @@ window.addEventListener('keydown', e => {
 let schedule = {
   version: 1,
   templates: [],
-  week: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }
+  week: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null },
+  done: {}
 };
 let activeTemplateId = null;
+let activeTab = 'plan';
+let checkDate = null; // 'YYYY-MM-DD' shown in the checklist; null = today
 
 const DAYS = [
   { key: 'mon', name: 'Monday', idx: 1 },
@@ -815,6 +901,159 @@ addBlockForm.addEventListener('submit', e => {
   setStatus('Unsaved changes');
 });
 
+// ================= Daily Checklist =================
+const pad2 = n => String(n).padStart(2, '0');
+const dateKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const keyToDate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const todayKey = () => dateKey(new Date());
+const checkView = document.getElementById('checkView');
+const planView = document.getElementById('planView');
+const tabPlan = document.getElementById('tabPlan');
+const tabCheck = document.getElementById('tabCheck');
+const dateLabel = document.getElementById('dateLabel');
+const checkList = document.getElementById('checkList');
+const checkTplName = document.getElementById('checkTplName');
+const checkCount = document.getElementById('checkCount');
+const progressFill = document.getElementById('progressFill');
+const historyEl = document.getElementById('history');
+
+function templateForDate(date) {
+  const day = DAYS.find(x => x.idx === date.getDay());
+  const id = schedule.week[day.key];
+  return schedule.templates.find(t => t.id === id) || null;
+}
+function isDone(key, id) {
+  return !!(schedule.done && schedule.done[key] && schedule.done[key].includes(id));
+}
+function doneCount(key, tpl) {
+  return tpl ? tpl.blocks.filter(b => isDone(key, b.id)).length : 0;
+}
+
+function toggleDone(key, id, done) {
+  if (!schedule.done) schedule.done = {};
+  const arr = schedule.done[key] || (schedule.done[key] = []);
+  if (done) {
+    if (!arr.includes(id)) arr.push(id);
+  } else {
+    const i = arr.indexOf(id);
+    if (i >= 0) arr.splice(i, 1);
+    if (!arr.length) delete schedule.done[key];
+  }
+  post({ t: 'check', date: key, id, done });
+  renderChecklist();
+}
+
+function renderChecklist() {
+  const key = checkDate || todayKey();
+  const date = keyToDate(key);
+  const isToday = key === todayKey();
+  const tpl = templateForDate(date);
+
+  dateLabel.textContent = '';
+  dateLabel.append(date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }));
+  if (isToday) {
+    const badge = document.createElement('span');
+    badge.className = 'today-badge';
+    badge.textContent = 'Today';
+    dateLabel.appendChild(badge);
+  }
+
+  checkList.innerHTML = '';
+  if (!tpl) {
+    const dayName = DAYS.find(x => x.idx === date.getDay()).name;
+    checkTplName.textContent = 'No template';
+    checkCount.textContent = '';
+    progressFill.style.width = '0%';
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = `No template is assigned to ${dayName}. Assign one in the Timetable tab (Week Plan).`;
+    checkList.appendChild(empty);
+  } else if (!tpl.blocks.length) {
+    checkTplName.textContent = tpl.name;
+    checkCount.textContent = '0 / 0 done';
+    progressFill.style.width = '0%';
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = `"${tpl.name}" has no blocks yet. Add some in the Timetable tab.`;
+    checkList.appendChild(empty);
+  } else {
+    const blocks = [...tpl.blocks].sort((a, b) => a.time.localeCompare(b.time));
+    const done = blocks.filter(b => isDone(key, b.id)).length;
+    checkTplName.textContent = tpl.name;
+    checkCount.textContent = '';
+    const strong = document.createElement('b');
+    strong.textContent = `${done} / ${blocks.length}`;
+    checkCount.append(strong, ' done');
+    progressFill.style.width = `${Math.round((done / blocks.length) * 100)}%`;
+
+    for (const b of blocks) {
+      const checked = isDone(key, b.id);
+      const row = document.createElement('div');
+      row.className = 'check-row' + (checked ? ' done' : '');
+      row.setAttribute('role', 'checkbox');
+      row.setAttribute('aria-checked', String(checked));
+
+      const box = document.createElement('span');
+      box.className = 'check-box';
+      box.textContent = checked ? '✓' : '';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'block-time';
+      timeSpan.textContent = b.time;
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'block-text';
+      textSpan.textContent = b.text;
+
+      row.append(box, timeSpan, textSpan);
+      row.addEventListener('click', () => toggleDone(key, b.id, !checked));
+      checkList.appendChild(row);
+    }
+  }
+
+  // Last 7 days strip (ending today), click to jump
+  historyEl.innerHTML = '';
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const k = dateKey(d);
+    const t = templateForDate(d);
+    const total = t ? t.blocks.length : 0;
+    const n = doneCount(k, t);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'hist-chip' + (k === key ? ' active' : '') + (total > 0 && n === total ? ' full' : '');
+    const top = document.createElement('b');
+    top.textContent = d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' + d.getDate();
+    chip.append(top, total ? `${n}/${total}` : '–');
+    chip.addEventListener('click', () => { checkDate = k; renderChecklist(); });
+    historyEl.appendChild(chip);
+  }
+}
+
+function shiftCheckDate(days) {
+  const d = keyToDate(checkDate || todayKey());
+  d.setDate(d.getDate() + days);
+  checkDate = dateKey(d);
+  renderChecklist();
+}
+document.getElementById('datePrev').addEventListener('click', () => shiftCheckDate(-1));
+document.getElementById('dateNext').addEventListener('click', () => shiftCheckDate(1));
+document.getElementById('dateToday').addEventListener('click', () => { checkDate = null; renderChecklist(); });
+
+function setTab(tab) {
+  activeTab = tab;
+  const isCheck = tab === 'check';
+  tabPlan.classList.toggle('active', !isCheck);
+  tabCheck.classList.toggle('active', isCheck);
+  planView.classList.toggle('view-hidden', isCheck);
+  checkView.classList.toggle('view-hidden', !isCheck);
+  btnSave.classList.toggle('view-hidden', isCheck);
+  if (isCheck) renderChecklist();
+}
+tabPlan.addEventListener('click', () => setTab('plan'));
+tabCheck.addEventListener('click', () => { checkDate = null; setTab('check'); });
+
 // Save Schedule
 btnSave.addEventListener('click', () => {
   setStatus('Saving schedule…');
@@ -829,8 +1068,17 @@ window.__sched = {
       templates: [],
       week: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }
     };
+    if (!schedule.done) schedule.done = {};
     renderTemplates();
+    if (activeTab === 'check') renderChecklist();
     setStatus('Schedule loaded', 'ok');
+  },
+  checkResult(ok, errorMsg) {
+    if (!ok) {
+      setStatus(`Could not save checklist: ${errorMsg || 'Unknown error'}`, 'err');
+    } else if (statusMsg.textContent !== 'Unsaved changes') {
+      setStatus('Checklist saved', 'ok');
+    }
   },
   saveResult(ok, errorMsg) {
     if (ok) {

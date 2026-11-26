@@ -636,6 +636,12 @@ let suppressClick = false;
 let autoResetTimer = null;
 let idleFidgetTimer = null;
 let audioCtx = null;
+// Sound on/off. Initial value is injected by the native app (before this script runs).
+let robotMuted = window.__robotMuted === true;
+window.__setMuted = muted => {
+  robotMuted = muted === true;
+  if (robotMuted && audioCtx && audioCtx.state === "running") audioCtx.suspend().catch(() => {});
+};
 
 // The ordered emotional behavior cycle directly matching reference sprites
 const BEHAVIORS = [
@@ -651,6 +657,7 @@ let currentBehaviorIndex = -1;
 
 // ================= PROCEDURAL AUDIO SYNTHESIZER =================
 function playRobotChime(mood) {
+  if (robotMuted) return;
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();

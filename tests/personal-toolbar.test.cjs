@@ -117,6 +117,29 @@ test("screenshot exclusion toggle synchronizes with the native setting", () => {
   app.dom.window.close();
 });
 
+test("Settings can mute and unmute the robot and tells the native app", () => {
+  const app = boot();
+  const sent = () => app.messages.map((x) => { try { return JSON.parse(x); } catch { return x; } })
+    .filter((x) => x && x.t === "set-setting");
+  clickLabel(app.document, "Settings");
+  clickLabel(app.document, "Mute robot");
+  assert.equal(sent().at(-1).robot_muted, true);
+  assert.equal(JSON.parse(app.window.localStorage.getItem("aalu.settings.v1")).robotMuted, true);
+  clickLabel(app.document, "Unmute robot");
+  assert.equal(sent().at(-1).robot_muted, false);
+  app.dom.window.close();
+});
+
+test("native-provided mute state wins over stale local storage", () => {
+  const dom = new JSDOM(html, { url: "https://aalu.test/toolbar/index.html", runScripts: "outside-only", pretendToBeVisual: true });
+  dom.window.ipc = { postMessage() {} };
+  dom.window.__nativeSettings = { robotMuted: true };
+  dom.window.eval(scriptMatch[1]);
+  clickLabel(dom.window.document, "Settings");
+  assert.ok([...dom.window.document.querySelectorAll(".lbl")].some((e) => e.textContent === "Unmute robot"));
+  dom.window.close();
+});
+
 test("Settings opens Window Manager and its actions reach the native bridge", () => {
   const app = boot();
   clickLabel(app.document, "Settings");

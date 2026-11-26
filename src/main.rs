@@ -109,6 +109,8 @@ const ERROR_ALREADY_EXISTS: u32 = 183;
 
 // Controls screenshot visibility of the robot window only. Visible by default.
 static ROBOT_VISIBLE_IN_CAPTURE: AtomicBool = AtomicBool::new(true);
+// When true the robot makes no sounds (chimes and reminder beeps). Sound is on by default.
+static ROBOT_MUTED: AtomicBool = AtomicBool::new(false);
 
 #[link(name = "user32")]
 extern "system" {
@@ -168,6 +170,25 @@ fn save_robot_capture_setting(visible: bool) {
     let value = if visible { "1" } else { "0" };
     let _ = Command::new("reg.exe")
         .args(["add", CAPTURE_SETTING_KEY, "/v", "RobotVisibleInCapture", "/t", "REG_DWORD", "/d", value, "/f"])
+        .creation_flags(0x0800_0000)
+        .output();
+}
+
+fn load_robot_muted_setting() -> bool {
+    let output = Command::new("reg.exe")
+        .args(["query", CAPTURE_SETTING_KEY, "/v", "RobotSoundMuted"])
+        .creation_flags(0x0800_0000)
+        .output();
+    let Ok(output) = output else { return false };
+    if !output.status.success() { return false; }
+    let text = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    text.split_whitespace().last().map(|value| value != "0x0").unwrap_or(false)
+}
+
+fn save_robot_muted_setting(muted: bool) {
+    let value = if muted { "1" } else { "0" };
+    let _ = Command::new("reg.exe")
+        .args(["add", CAPTURE_SETTING_KEY, "/v", "RobotSoundMuted", "/t", "REG_DWORD", "/d", value, "/f"])
         .creation_flags(0x0800_0000)
         .output();
 }
@@ -339,6 +360,7 @@ fn robot_start_position(
 
 fn main() -> wry::Result<()> {
     ROBOT_VISIBLE_IN_CAPTURE.store(load_robot_capture_setting(), AtomicOrdering::Relaxed);
+    ROBOT_MUTED.store(load_robot_muted_setting(), AtomicOrdering::Relaxed);
     if !acquire_single_instance() {
         bridge::log("ignored duplicate launch: an Aalu instance is already running");
         return Ok(());
@@ -466,6 +488,7 @@ fn main() -> wry::Result<()> {
             let robot_proxy = proxy.clone();
             match WebViewBuilder::new()
                 .with_autoplay(true)
+                .with_initialization_script(&format!("window.__robotMuted = {};", ROBOT_MUTED.load(AtomicOrdering::Relaxed)))
                 .with_html(ROBOT_HTML)
                 .with_transparent(true)
                 .with_ipc_handler(move |request| {
@@ -574,6 +597,11 @@ fn main() -> wry::Result<()> {
                         ROBOT_VISIBLE_IN_CAPTURE.store(visible, AtomicOrdering::Relaxed);
                         save_robot_capture_setting(visible);
                         apply_robot_capture_affinity(&robot_window);
+                    }
+                    if let Some(muted) = msg.get("robot_muted").and_then(|v| v.as_bool()) {
+                        ROBOT_MUTED.store(muted, AtomicOrdering::Relaxed);
+                        save_robot_muted_setting(muted);
+                        let _ = robot_webview.evaluate_script(&format!("window.__setMuted && window.__setMuted({muted})"));
                     }
                     let target = msg.get("target").and_then(|v| v.as_str()).unwrap_or("");
                     match msg.get("t").and_then(|v| v.as_str()) {
@@ -816,6 +844,30 @@ fn main() -> wry::Result<()> {
                                     let _ = view.evaluate_script(&format!(
                                         "window.__sched.saveResult(false, {err_js})"
                                     ));
+                                }
+                            }
+                        }
+                    }
+                    Some("check") => {
+                        // Checklist tick: updates only the done-state and saves it right away,
+                        // without touching any unsaved template edits in the scheduler window.
+                        let date = ipc["date"].as_str().unwrap_or("");
+                        let block_id = ipc["id"].as_str().unwrap_or("");
+                        let done = ipc["done"].as_bool().unwrap_or(false);
+                        let result: Result<(), String> = {
+                            let mut guard = shared_sched.0.lock().unwrap();
+                            if scheduler::set_block_done(&mut guard, date, block_id, done) {
+                                scheduler::save_schedule(&mut guard)
+                            } else {
+                                Err("Invalid checklist entry".into())
+                            }
+                        };
+                        if let Some(view) = scheduler_webview.as_ref() {
+                            match result {
+                                Ok(()) => { let _ = view.evaluate_script("window.__sched.checkResult(true, null)"); }
+                                Err(err) => {
+                                    let err_js = serde_json::to_string(&err).unwrap_or_else(|_| "\"Save error\"".into());
+                                    let _ = view.evaluate_script(&format!("window.__sched.checkResult(false, {err_js})"));
                                 }
                             }
                         }
@@ -1433,7 +1485,8 @@ fn toggle_toolbar(
         if !visible {
             if let Some(view) = webview_slot.as_ref() {
                 let show = ROBOT_VISIBLE_IN_CAPTURE.load(AtomicOrdering::Relaxed);
-                let _ = view.evaluate_script(&format!("window.__setSettings && window.__setSettings({{showRobotInCapture: {show}}}); window.__reset && window.__reset();"));
+                let muted = ROBOT_MUTED.load(AtomicOrdering::Relaxed);
+                let _ = view.evaluate_script(&format!("window.__setSettings && window.__setSettings({{showRobotInCapture: {show}, robotMuted: {muted}}}); window.__reset && window.__reset();"));
             }
             center_toolbar(target, window);
         }
@@ -1461,6 +1514,7 @@ fn toggle_toolbar(
     match WebViewBuilder::new()
         // A named secure origin is required for WebView2 localStorage persistence.
         .with_https_scheme(true)
+        .with_initialization_script(&format!("window.__nativeSettings = {{ robotMuted: {} }};", ROBOT_MUTED.load(AtomicOrdering::Relaxed)))
         .with_custom_protocol("aalu".into(), |_webview_id, _request| {
             wry::http::Response::builder()
                 .header("Content-Type", "text/html; charset=utf-8")
