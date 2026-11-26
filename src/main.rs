@@ -1448,7 +1448,12 @@ fn toggle_toolbar(
         .with_ipc_handler(move |request| { let _ = toolbar_proxy.send_event(AppEvent::ToolbarMessage(request.body().clone())); })
         .build(&window)
     {
-        Ok(view) => { *window_slot = Some(window); *webview_slot = Some(view); }
+        Ok(view) => {
+            *window_slot = Some(window);
+            *webview_slot = Some(view);
+            // Apply the current screenshot-exclusion preference to the newly created toolbar too.
+            apply_capture_affinity(&[window_slot.as_ref()]);
+        }
         Err(error) => eprintln!("Could not create Personal Toolbar WebView: {error}"),
     }
 }
