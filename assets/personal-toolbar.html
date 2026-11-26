@@ -75,7 +75,7 @@ function loadSettings(){try{const s=JSON.parse(localStorage.getItem(settingsKey)
 function persistSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(error){notify("Could not save settings in this WebView",true)}sendNative({t:"set-setting",hide_on_capture:settings.hideOnCapture})}
 window.__setSettings=function(s){if(s&&typeof s.hideOnCapture==="boolean"){settings.hideOnCapture=s.hideOnCapture;try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch(e){}render()}};
 
-function load(){try{const value=JSON.parse(localStorage.getItem(key)||"{}");return value&&typeof value==="object"&&!Array.isArray(value)?value:{}}catch{return{}}}
+function load(){try{const value=JSON.parse(localStorage.getItem(key)||"{}");if(!value||typeof value!=="object"||Array.isArray(value))return{};const clean={};for(const [name,items] of Object.entries(value)){if(Array.isArray(items))clean[name]=items.filter(x=>x&&typeof x.name==="string"&&typeof x.target==="string"&&typeof x.kind==="string")}return clean}catch{return{}}}
 function persist(){try{localStorage.setItem(key,JSON.stringify(data));return true}catch(error){notify("Could not save toolbar items. Check WebView storage permissions.",true);return false}}
 function hue(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h}
 function clear(){panel.querySelectorAll(".slot").forEach(e=>e.remove())}
@@ -137,10 +137,10 @@ window.__picked=p=>{if(!p)return;if(p.startsWith("__AALU_ERROR__")){notify(p.sli
 window.__actionResult=(ok,message,closeAfter)=>{notify(message|| (ok?"Done":"Action failed"),!ok);if(ok&&closeAfter)setTimeout(()=>sendNative("close"),650)};
 document.getElementById("cancel").onclick=()=>document.getElementById("modal").classList.remove("open");
 document.getElementById("save").onclick=()=>{const name=document.getElementById("name").value.trim(),target=document.getElementById("target").value.trim(),kind=document.getElementById("kind").value;if(!name||!target){notify("Enter both a name and a target",true);return}if(kind==="url"){let url=target;if(!/^https?:\/\//i.test(url))url="https://"+url;try{new URL(url)}catch{notify("Enter a valid website address",true);return}}if(!Array.isArray(data[addTo]))data[addTo]=[];data[addTo].push({name,target,kind});if(!persist())return;document.getElementById("modal").classList.remove("open");render();notify("Added "+name)};
-center.onclick=()=>{if(view===null)window.ipc.postMessage("close");else{view=null;render()}};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(document.getElementById("modal").classList.contains("open"))document.getElementById("modal").classList.remove("open");else if(view!==null){view=null;render()}else window.ipc.postMessage("close")}});
+center.onclick=()=>{if(view===null)sendNative("close");else{view=null;render()}};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(document.getElementById("modal").classList.contains("open"))document.getElementById("modal").classList.remove("open");else if(view!==null){view=null;render()}else sendNative("close")}});
 // Click on empty space (anything that is not a slot, the centre, or the add dialog) closes the toolbar.
-document.addEventListener("click",e=>{if(document.getElementById("modal").classList.contains("open"))return;if(e.target.closest&&e.target.closest(".slot,#center,#modal"))return;window.ipc.postMessage("close")});
+document.addEventListener("click",e=>{if(document.getElementById("modal").classList.contains("open"))return;if(e.target.closest&&e.target.closest(".slot,#center,#modal"))return;sendNative("close")});
 document.addEventListener("wheel",e=>{if(view===null)return;page=Math.max(0,page+(e.deltaY>0?1:-1));render()},{passive:true});
 window.__reset=()=>{view=null;page=0;document.getElementById("modal").classList.remove("open");render()};
 
